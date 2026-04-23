@@ -1,10 +1,17 @@
 import { useState } from 'react'
+import { AlertTriangle, ShieldCheck, ShieldX } from 'lucide-react'
 import { obstacles } from '../mockData'
+import { PowerLineIcon, FenceIcon, TowerHazardIcon } from './icons'
 
 const LOW_CONF = obstacles.filter(o => o.confidence === 'LOW')
 const MED_CONF = obstacles.filter(o => o.confidence === 'MEDIUM')
 
-const OBS_ICON = { power_line: '⚡', fence_line: '🚧', tower: '📡' }
+function ObsIcon({ type, size = 16 }) {
+  if (type === 'power_line') return <PowerLineIcon size={size} color="#ef4444" />
+  if (type === 'fence_line') return <FenceIcon size={size} color="#f97316" />
+  if (type === 'tower') return <TowerHazardIcon size={size} color="#dc2626" />
+  return null
+}
 
 function Alert({ obs, onResolve }) {
   const isLow = obs.confidence === 'LOW'
@@ -16,8 +23,9 @@ function Alert({ obs, onResolve }) {
             <span className={`text-xs font-bold px-2 py-0.5 rounded ${isLow ? 'bg-red-600 text-white' : 'bg-amber-600 text-white'}`}>
               {obs.confidence}
             </span>
+            <ObsIcon type={obs.type} size={15} />
             <span className="text-sm font-medium text-slate-200">
-              {OBS_ICON[obs.type]} {obs.type.replace('_', ' ').toUpperCase()}
+              {obs.type.replace('_', ' ').toUpperCase()}
             </span>
           </div>
           <p className="text-xs text-slate-400 leading-relaxed">{obs.note}</p>
@@ -28,15 +36,15 @@ function Alert({ obs, onResolve }) {
         <div className="flex gap-2 mt-2">
           <button
             onClick={() => onResolve(obs.id, 'hazard')}
-            className="flex-1 text-xs py-1.5 rounded bg-red-700 hover:bg-red-600 text-white font-medium transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded bg-red-700 hover:bg-red-600 text-white font-medium transition-colors"
           >
-            Mark Hazard
+            <ShieldX size={13} /> Mark Hazard
           </button>
           <button
             onClick={() => onResolve(obs.id, 'safe')}
-            className="flex-1 text-xs py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
           >
-            Confirm Safe
+            <ShieldCheck size={13} /> Confirm Safe
           </button>
         </div>
       )}
@@ -62,7 +70,7 @@ export default function AlertPanel({ onObstacleResolved }) {
       <div className="px-4 py-3 border-b border-slate-700">
         <div className="flex items-center gap-2">
           {pending.length > 0 && (
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+            <AlertTriangle size={15} className="text-red-400 animate-pulse" />
           )}
           <span className="font-semibold text-sm text-slate-100">Obstacle Alerts</span>
           {pending.length > 0 && (
@@ -94,7 +102,8 @@ export default function AlertPanel({ onObstacleResolved }) {
               <div key={o.id} className="rounded-lg p-2.5 mb-1.5 border border-slate-700 bg-slate-800/50">
                 <div className="flex items-center gap-2">
                   <span className="text-xs bg-amber-700 text-white px-1.5 py-0.5 rounded">MED</span>
-                  <span className="text-xs text-slate-300">{OBS_ICON[o.type]} {o.type.replace('_', ' ')} — {o.height_m}m</span>
+                  <ObsIcon type={o.type} size={13} />
+                  <span className="text-xs text-slate-300">{o.type.replace('_', ' ')} — {o.height_m}m</span>
                 </div>
               </div>
             ))}
@@ -105,12 +114,12 @@ export default function AlertPanel({ onObstacleResolved }) {
       {/* Legend */}
       <div className="px-3 py-2 border-t border-slate-700 space-y-1">
         <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Map Legend</p>
-        <div className="flex items-center gap-2 text-xs text-slate-400"><span className="w-3 h-0.5 bg-red-500 inline-block" style={{borderTop:'2px dashed #ef4444'}}></span>Power line</div>
-        <div className="flex items-center gap-2 text-xs text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block"></span>Fence posts</div>
-        <div className="flex items-center gap-2 text-xs text-slate-400"><span className="w-2.5 h-2.5 rounded-full border-2 border-red-600 inline-block"></span>Tower exclusion</div>
-        <div className="flex items-center gap-2 text-xs text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span>HIGH conf cluster</div>
-        <div className="flex items-center gap-2 text-xs text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>MEDIUM conf cluster</div>
-        <div className="flex items-center gap-2 text-xs text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-indigo-400 inline-block"></span>Pass 2 waypoint</div>
+        <div className="flex items-center gap-2 text-xs text-slate-400"><PowerLineIcon size={14} color="#ef4444" />Power line</div>
+        <div className="flex items-center gap-2 text-xs text-slate-400"><FenceIcon size={14} color="#f97316" />Fence line</div>
+        <div className="flex items-center gap-2 text-xs text-slate-400"><TowerHazardIcon size={14} color="#dc2626" />Tower exclusion</div>
+        <div className="flex items-center gap-2 text-xs text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0 inline-block" />HIGH conf cluster</div>
+        <div className="flex items-center gap-2 text-xs text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 inline-block" />MEDIUM conf cluster</div>
+        <div className="flex items-center gap-2 text-xs text-slate-400"><span className="w-2.5 h-2.5 rounded-full bg-indigo-400 shrink-0 inline-block" />Pass 2 waypoint</div>
       </div>
     </div>
   )
