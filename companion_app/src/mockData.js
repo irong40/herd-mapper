@@ -37,14 +37,16 @@ export const obstacles = [
   { id: 'tower_001', lat: 36.7836, lon: -76.4499, height_m: 28, type: 'tower',      confidence: 'LOW',    exclusion_radius_m: 42, note: 'Unidentified structure — possible comms tower. GUY WIRE HAZARD. Operator confirm required.' },
 ]
 
-// Pass 2 waypoints — locked if near unresolved LOW confidence obstacle
-export const pass2Waypoints = clusters.map((c, i) => {
+// Base Pass 2 waypoints — locked state is derived reactively in App.jsx
+export const pass2WaypointsBase = clusters.map((c, i) => {
   const nearTower = c.id === 'cluster_004'
   return {
     index: i + 1,
     ...c,
+    id: c.id,
     safe_alt_m: nearTower ? 55 : 30,
     locked: nearTower,
-    lock_reason: nearTower ? 'Unresolved LOW confidence obstacle nearby (tower_001)' : null,
+    locked_by: nearTower ? 'tower_001' : null,
+    lock_reason: nearTower ? 'Tower exclusion zone overlap — confirm obstacle before routing' : null,
   }
 })

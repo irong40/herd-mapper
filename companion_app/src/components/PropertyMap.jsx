@@ -1,9 +1,19 @@
-import { useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Polyline, Circle, Tooltip, Rectangle } from 'react-leaflet'
+import { useEffect, useMemo } from 'react'
+import { MapContainer, TileLayer, Marker, Polyline, Circle, Tooltip, Rectangle, useMap } from 'react-leaflet'
 import { divIcon } from 'leaflet'
-import { bounds, lake, clusters, obstacles, pass2Waypoints } from '../mockData'
+import { bounds, lake, clusters, obstacles } from '../mockData'
 
 const CONF_COLORS = { HIGH: '#22c55e', MEDIUM: '#f59e0b', LOW: '#ef4444' }
+
+function FlyToCluster({ clusterId }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!clusterId) return
+    const c = clusters.find(cl => cl.id === clusterId)
+    if (c) map.flyTo([c.lat, c.lon], 19, { duration: 0.7 })
+  }, [clusterId, map])
+  return null
+}
 
 function ClusterMarkers({ selected, onSelect }) {
   return clusters.map(c => {
@@ -18,15 +28,15 @@ function ClusterMarkers({ selected, onSelect }) {
     return (
       <Marker key={c.id} position={[c.lat, c.lon]} icon={icon} eventHandlers={{ click: () => onSelect(c.id) }}>
         <Tooltip direction="top" offset={[0, -26]} opacity={1}>
-          <strong>{c.count} deer</strong> · {c.confidence} · {c.id}
+          <strong>{c.count} deer</strong> · {c.confidence} · {c.label}
         </Tooltip>
       </Marker>
     )
   })
 }
 
-function Pass2WaypointMarkers() {
-  return pass2Waypoints.map(wp => {
+function Pass2WaypointMarkers({ waypoints }) {
+  return waypoints.map(wp => {
     const color = wp.locked ? '#ef4444' : '#818cf8'
     const icon = divIcon({
       html: `<div class="hm-wp" style="--c:${color}">
@@ -101,7 +111,7 @@ function PropertyBoundary() {
   )
 }
 
-export default function PropertyMap({ selectedCluster, onSelectCluster }) {
+export default function PropertyMap({ selectedCluster, onSelectCluster, waypoints }) {
   return (
     <MapContainer
       center={bounds.center}
@@ -109,22 +119,21 @@ export default function PropertyMap({ selectedCluster, onSelectCluster }) {
       style={{ flex: 1, width: '100%' }}
       zoomControl={true}
     >
-      {/* Satellite base */}
       <TileLayer
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         attribution="Tiles &copy; Esri"
         maxZoom={20}
       />
-      {/* Dark label overlay */}
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
         attribution=""
         opacity={0.65}
       />
+      <FlyToCluster clusterId={selectedCluster} />
       <PropertyBoundary />
       <LakeOverlay />
       <ObstacleOverlay />
-      <Pass2WaypointMarkers />
+      <Pass2WaypointMarkers waypoints={waypoints} />
       <ClusterMarkers selected={selectedCluster} onSelect={onSelectCluster} />
     </MapContainer>
   )

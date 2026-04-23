@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { AlertTriangle, ShieldCheck, ShieldX, CheckCircle } from 'lucide-react'
+import { ShieldCheck, ShieldX, CheckCircle, AlertTriangle } from 'lucide-react'
 import { obstacles } from '../mockData'
 import { PowerLineIcon, FenceIcon, TowerHazardIcon } from './icons'
 
@@ -47,21 +46,29 @@ function Alert({ obs, onResolve }) {
   )
 }
 
-export default function AlertPanel({ onObstacleResolved }) {
-  const [resolved, setResolved] = useState({})
+function ResolvedBadge({ resolution }) {
+  if (resolution === 'safe') return (
+    <div className="flex items-center gap-2 rounded px-3 py-2 mb-2 border border-green-900/40 bg-green-950/20">
+      <ShieldCheck size={12} className="text-green-500" />
+      <span className="text-[11px] text-green-500 font-mono">CONFIRMED SAFE — waypoint unlocked</span>
+    </div>
+  )
+  return (
+    <div className="flex items-center gap-2 rounded px-3 py-2 mb-2 border border-red-900/40 bg-red-950/20">
+      <ShieldX size={12} className="text-red-500" />
+      <span className="text-[11px] text-red-500 font-mono">MARKED HAZARD — route excluded</span>
+    </div>
+  )
+}
 
-  const pending    = LOW_CONF.filter(o => !resolved[o.id])
+export default function AlertPanel({ resolvedObstacles, onResolve }) {
+  const pending    = LOW_CONF.filter(o => !resolvedObstacles[o.id])
+  const resolved   = LOW_CONF.filter(o =>  resolvedObstacles[o.id])
   const softAlerts = MED_CONF.slice(0, 3)
-
-  function handleResolve(id, decision) {
-    setResolved(r => ({ ...r, [id]: decision }))
-    onObstacleResolved?.(id, decision)
-  }
 
   return (
     <div className="w-72 bg-[#0c0f16]/95 border-l border-slate-800/80 flex flex-col overflow-hidden" style={{ backdropFilter: 'blur(8px)' }}>
 
-      {/* Header */}
       <div className="px-4 py-2.5 border-b border-slate-800/80">
         <div className="flex items-center gap-2">
           {pending.length > 0 && <AlertTriangle size={13} className="text-red-400" />}
@@ -79,16 +86,22 @@ export default function AlertPanel({ onObstacleResolved }) {
       <div className="flex-1 overflow-y-auto p-3">
 
         {pending.length === 0 && LOW_CONF.length > 0 && (
-          <div className="flex items-center justify-center gap-2 text-green-400 text-xs py-4 font-mono">
-            <CheckCircle size={14} />
-            ALL ALERTS RESOLVED — PASS 2 READY
+          <div className="flex items-center justify-center gap-2 text-green-400 text-[11px] py-4 font-mono">
+            <CheckCircle size={13} /> ALL ALERTS RESOLVED
           </div>
         )}
 
         {pending.length > 0 && (
           <>
             <p className="text-[9px] text-slate-600 font-mono uppercase tracking-widest mb-2">Requires confirmation</p>
-            {pending.map(o => <Alert key={o.id} obs={o} onResolve={handleResolve} />)}
+            {pending.map(o => <Alert key={o.id} obs={o} onResolve={onResolve} />)}
+          </>
+        )}
+
+        {resolved.length > 0 && (
+          <>
+            <p className="text-[9px] text-slate-600 font-mono uppercase tracking-widest mt-2 mb-2">Resolved</p>
+            {resolved.map(o => <ResolvedBadge key={o.id} resolution={resolvedObstacles[o.id]} />)}
           </>
         )}
 
