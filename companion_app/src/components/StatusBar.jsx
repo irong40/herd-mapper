@@ -4,15 +4,19 @@ import { clusters } from '../mockData'
 
 const totalDeer = clusters.reduce((s, c) => s + c.count, 0)
 
-export default function StatusBar({ waypoints, pendingAlerts, pass2Ready, launchState }) {
+export default function StatusBar({ waypoints, pendingAlerts, pass2Ready, launchState, isLive, missionId }) {
   return (
     <div className="h-11 bg-[#0a0d12]/95 border-b border-slate-800 flex items-center px-4 gap-5 shrink-0" style={{ backdropFilter: 'blur(8px)' }}>
       <div className="flex items-center gap-2">
-        <DroneIcon size={16} color={launchState === 'executing' ? '#f59e0b' : launchState === 'complete' ? '#22c55e' : '#22c55e'} />
+        <DroneIcon size={16} color={launchState === 'executing' ? '#f59e0b' : '#22c55e'} />
         <span className="text-sm font-semibold tracking-wide text-slate-100">HERD MAPPER</span>
         <span className="text-[10px] text-slate-600 font-mono ml-1 uppercase tracking-widest">
           {launchState === 'executing' ? 'PASS 2 — EXECUTING' : launchState === 'complete' ? 'PASS 2 — COMPLETE' : 'PASS 1 COMPLETE'}
         </span>
+        {isLive
+          ? <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-green-800/60 text-green-500 uppercase tracking-widest">LIVE · {missionId}</span>
+          : <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-slate-700/60 text-slate-600 uppercase tracking-widest">DEMO</span>
+        }
       </div>
 
       <div className="h-3 w-px bg-slate-800" />

@@ -1,9 +1,5 @@
 import { ShieldCheck, ShieldX, CheckCircle, AlertTriangle } from 'lucide-react'
-import { obstacles } from '../mockData'
 import { PowerLineIcon, FenceIcon, TowerHazardIcon } from './icons'
-
-const LOW_CONF = obstacles.filter(o => o.confidence === 'LOW')
-const MED_CONF = obstacles.filter(o => o.confidence === 'MEDIUM')
 
 function ObsIcon({ type, size = 15 }) {
   if (type === 'power_line') return <PowerLineIcon size={size} color="#ef4444" />
@@ -61,7 +57,9 @@ function ResolvedBadge({ resolution }) {
   )
 }
 
-export default function AlertPanel({ resolvedObstacles, onResolve }) {
+export default function AlertPanel({ obstacles = [], resolvedObstacles, onResolve }) {
+  const LOW_CONF   = obstacles.filter(o => o.confidence === 'LOW')
+  const MED_CONF   = obstacles.filter(o => o.confidence === 'MEDIUM')
   const pending    = LOW_CONF.filter(o => !resolvedObstacles[o.id])
   const resolved   = LOW_CONF.filter(o =>  resolvedObstacles[o.id])
   const softAlerts = MED_CONF.slice(0, 3)

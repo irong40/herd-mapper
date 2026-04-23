@@ -1,21 +1,20 @@
 import { useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Polyline, Circle, Tooltip, Rectangle, useMap } from 'react-leaflet'
 import { divIcon } from 'leaflet'
-import { bounds, lake, clusters, obstacles } from '../mockData'
 
 const CONF_COLORS = { HIGH: '#22c55e', MEDIUM: '#f59e0b', LOW: '#ef4444' }
 
-function FlyToCluster({ clusterId }) {
+function FlyToCluster({ clusterId, clusters }) {
   const map = useMap()
   useEffect(() => {
     if (!clusterId) return
     const c = clusters.find(cl => cl.id === clusterId)
     if (c) map.flyTo([c.lat, c.lon], 19, { duration: 0.7 })
-  }, [clusterId, map])
+  }, [clusterId, clusters, map])
   return null
 }
 
-function ClusterMarkers({ selected, onSelect }) {
+function ClusterMarkers({ clusters, selected, onSelect }) {
   return clusters.map(c => {
     const color = CONF_COLORS[c.confidence]
     const isSelected = selected === c.id
@@ -59,7 +58,7 @@ function Pass2WaypointMarkers({ waypoints }) {
   })
 }
 
-function ObstacleOverlay() {
+function ObstacleOverlay({ obstacles }) {
   const powerPoints = obstacles.filter(o => o.type === 'power_line').map(o => [o.lat, o.lon])
   const fencePosts  = obstacles.filter(o => o.type === 'fence_line')
   const towers      = obstacles.filter(o => o.type === 'tower')
@@ -93,7 +92,8 @@ function ObstacleOverlay() {
   )
 }
 
-function LakeOverlay() {
+function LakeOverlay({ lake }) {
+  if (!lake) return null
   return (
     <Circle center={lake.center} radius={lake.radius_m}
       pathOptions={{ color: '#38bdf8', fillColor: '#0ea5e9', fillOpacity: 0.18, weight: 1 }}>
@@ -102,7 +102,7 @@ function LakeOverlay() {
   )
 }
 
-function PropertyBoundary() {
+function PropertyBoundary({ bounds }) {
   const sw = [bounds.south, bounds.west]
   const ne = [bounds.north, bounds.east]
   return (
@@ -111,7 +111,8 @@ function PropertyBoundary() {
   )
 }
 
-export default function PropertyMap({ selectedCluster, onSelectCluster, waypoints }) {
+export default function PropertyMap({ selectedCluster, onSelectCluster, waypoints, bounds, lake, clusters, obstacles }) {
+  if (!bounds) return null
   return (
     <MapContainer
       center={bounds.center}
@@ -129,12 +130,12 @@ export default function PropertyMap({ selectedCluster, onSelectCluster, waypoint
         attribution=""
         opacity={0.65}
       />
-      <FlyToCluster clusterId={selectedCluster} />
-      <PropertyBoundary />
-      <LakeOverlay />
-      <ObstacleOverlay />
+      <FlyToCluster clusterId={selectedCluster} clusters={clusters} />
+      <PropertyBoundary bounds={bounds} />
+      <LakeOverlay lake={lake} />
+      <ObstacleOverlay obstacles={obstacles} />
       <Pass2WaypointMarkers waypoints={waypoints} />
-      <ClusterMarkers selected={selectedCluster} onSelect={onSelectCluster} />
+      <ClusterMarkers clusters={clusters} selected={selectedCluster} onSelect={onSelectCluster} />
     </MapContainer>
   )
 }
