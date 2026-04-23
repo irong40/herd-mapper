@@ -12,11 +12,13 @@ import cv2
 import numpy as np
 import argparse
 import json
-import os
 from pathlib import Path
-from PIL import Image
-import exifread
 from scipy import ndimage
+
+# sentinel-core handles DJI EXIF/XMP/thermal metadata — no need to reimplement
+from sentinel_core.metadata import extract_gps_from_exif, extract_thermal_metadata
+from sentinel_core.filename import parse_dji_filename
+from sentinel_core.constants import PHOTO_EXTENSIONS
 
 
 THERMAL_THRESHOLD = 200      # pixel intensity above background — tune per conditions
@@ -26,18 +28,19 @@ CONFIDENCE_MIN_AREA = 40     # blobs above this px area get HIGH confidence
 
 
 def extract_gps(image_path: str) -> tuple[float, float] | None:
-    with open(image_path, 'rb') as f:
-        tags = exifread.process_file(f, stop_tag='GPS GPSLongitude')
-    try:
-        def dms_to_decimal(dms, ref):
-            d, m, s = [float(x.num) / float(x.den) for x in dms.values]
-            dd = d + m / 60 + s / 3600
-            return -dd if ref.values[0] in ['S', 'W'] else dd
-
-        lat = dms_to_decimal(tags['GPS GPSLatitude'], tags['GPS GPSLatitudeRef'])
-        lon = dms_to_decimal(tags['GPS GPSLongitude'], tags['GPS GPSLongitudeRef'])
+    result = extract_gps_from_exif(image_path)
+    if result:
+        lon, lat, _ = result  # sentinel-core returns [lon, lat, alt]
         return lat, lon
-    except KeyError:
+    return None
+
+
+def extract_canopy_height(image_path: str) -> float | None:
+    """Get canopy height from M4T thermal metadata if available — feeds obstacle mapper."""
+    try:
+        meta = extract_thermal_metadata(image_path)
+        return meta.get('canopy_height')
+    except Exception:
         return None
 
 
@@ -123,7 +126,11 @@ def run(mission_dir: str, output_dir: str):
     output_path.mkdir(parents=True, exist_ok=True)
 
     all_detections = []
-    thermal_images = list(mission_path.glob('*.jpg')) + list(mission_path.glob('*.JPG'))
+    thermal_images = [
+        p for p in mission_path.iterdir()
+        if p.suffix.lower() in PHOTO_EXTENSIONS
+    ]
+    thermal_images.sort(key=lambda p: parse_dji_filename(p.name).get('sequence', 0))
     print(f"Processing {len(thermal_images)} thermal images...")
 
     for img_path in thermal_images:
