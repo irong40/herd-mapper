@@ -2,5 +2,116 @@
 @import "leaflet/dist/leaflet.css";
 
 * { box-sizing: border-box; }
-body { margin: 0; background: #0f1117; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; }
+body { margin: 0; background: #0a0d12; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; }
 #root { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+
+/* ─── Cluster reticle markers ─────────────────────────────────── */
+.hm-cluster {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  border: 1.5px solid var(--c);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+.hm-cluster::before, .hm-cluster::after {
+  content: '';
+  position: absolute;
+  background: var(--c);
+  opacity: 0.25;
+}
+.hm-cluster::before { width: 100%; height: 1px; }
+.hm-cluster::after  { width: 1px; height: 100%; }
+.hm-cluster span {
+  color: var(--c);
+  font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-family: 'Courier New', monospace;
+  z-index: 1; position: relative;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--c) 80%, transparent);
+}
+.hm-cluster--selected {
+  border-width: 2px;
+  box-shadow:
+    0 0 0 5px color-mix(in srgb, var(--c) 20%, transparent),
+    0 0 16px color-mix(in srgb, var(--c) 40%, transparent);
+}
+.hm-cluster--pulse::after {
+  content: '';
+  position: absolute;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  border: 1.5px solid var(--c);
+  opacity: 0;
+  animation: hm-ring 2s ease-out infinite;
+}
+@keyframes hm-ring {
+  0%   { transform: scale(1);    opacity: 0.6; }
+  100% { transform: scale(1.9);  opacity: 0; }
+}
+
+/* ─── Waypoint markers ────────────────────────────────────────── */
+.hm-wp {
+  width: 22px; height: 22px;
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.hm-wp-ring {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--c);
+  background: color-mix(in srgb, var(--c) 20%, transparent);
+  position: absolute;
+}
+.hm-wp-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--c);
+  position: absolute;
+  box-shadow: 0 0 6px var(--c);
+}
+.hm-wp-h, .hm-wp-v {
+  position: absolute;
+  background: var(--c);
+  opacity: 0.35;
+}
+.hm-wp-h { width: 18px; height: 1px; }
+.hm-wp-v { width: 1px; height: 18px; }
+
+/* ─── Leaflet overrides ───────────────────────────────────────── */
+.leaflet-tooltip {
+  background: rgba(10, 13, 18, 0.92) !important;
+  border: 1px solid rgba(100, 116, 139, 0.4) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+  color: #e2e8f0 !important;
+  font-size: 11px !important;
+  font-family: 'Courier New', monospace !important;
+  padding: 4px 8px !important;
+  white-space: nowrap;
+}
+.leaflet-tooltip-top::before { border-top-color: rgba(100, 116, 139, 0.4) !important; }
+.cluster-tip { padding: 0 !important; background: transparent !important; border: none !important; box-shadow: none !important; }
+.leaflet-control-zoom {
+  border: 1px solid rgba(100, 116, 139, 0.3) !important;
+  border-radius: 4px !important;
+  overflow: hidden;
+}
+.leaflet-control-zoom a {
+  background: rgba(10, 13, 18, 0.88) !important;
+  color: #94a3b8 !important;
+  border-bottom-color: rgba(100, 116, 139, 0.2) !important;
+  width: 28px !important; height: 28px !important;
+  line-height: 28px !important;
+  font-size: 16px !important;
+}
+.leaflet-control-zoom a:hover { background: rgba(30, 35, 46, 0.95) !important; color: #e2e8f0 !important; }
+.leaflet-attribution-flag { display: none !important; }
+.leaflet-control-attribution {
+  background: rgba(10,13,18,0.7) !important;
+  color: #475569 !important;
+  font-size: 9px !important;
+}
+.leaflet-container { background: #0a0d12; }
