@@ -1,0 +1,416 @@
+[
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45454320253013,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45440861037832,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45427401822651,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.4541394260747,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45400483392291,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.4538702417711,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45373564961929,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45360105746748,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45346646531567,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45333187316386,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45319728101205,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45306268886024,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45292809670843,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45279350455662,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45265891240481,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.452524320253,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.4523897281012,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45225513594939,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45212054379758,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45198595164577,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45185135949397,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45171676734216,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45158217519035,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45144758303854,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45131299088673,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45117839873492,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45104380658312,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.4509092144313,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.4507746222795,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45064003012769,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45050543797588,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45037084582407,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45023625367226,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.45010166152045,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78394153790873,
+    "lon": -76.44996706936864,
+    "height_m": 6.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 4.0,
+    "note": "Post pattern inferred \u2014 north boundary"
+  },
+  {
+    "lat": 36.78353729787999,
+    "lon": -76.45431888227712,
+    "height_m": 14.0,
+    "type": "power_line",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 8.0,
+    "note": "OSM confirmed \u2014 utility corridor"
+  },
+  {
+    "lat": 36.78324983830399,
+    "lon": -76.4539151058217,
+    "height_m": 14.0,
+    "type": "power_line",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 8.0,
+    "note": "OSM confirmed \u2014 utility corridor"
+  },
+  {
+    "lat": 36.782962378727994,
+    "lon": -76.45351132936626,
+    "height_m": 14.0,
+    "type": "power_line",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 8.0,
+    "note": "OSM confirmed \u2014 utility corridor"
+  },
+  {
+    "lat": 36.782674919151994,
+    "lon": -76.45310755291085,
+    "height_m": 14.0,
+    "type": "power_line",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 8.0,
+    "note": "OSM confirmed \u2014 utility corridor"
+  },
+  {
+    "lat": 36.782387459576,
+    "lon": -76.45270377645542,
+    "height_m": 14.0,
+    "type": "power_line",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 8.0,
+    "note": "OSM confirmed \u2014 utility corridor"
+  },
+  {
+    "lat": 36.7821,
+    "lon": -76.4523,
+    "height_m": 14.0,
+    "type": "power_line",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 8.0,
+    "note": "OSM confirmed \u2014 utility corridor"
+  },
+  {
+    "lat": 36.781812540424,
+    "lon": -76.45189622354457,
+    "height_m": 14.0,
+    "type": "power_line",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 8.0,
+    "note": "OSM confirmed \u2014 utility corridor"
+  },
+  {
+    "lat": 36.781525080848006,
+    "lon": -76.45149244708914,
+    "height_m": 14.0,
+    "type": "power_line",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 8.0,
+    "note": "OSM confirmed \u2014 utility corridor"
+  },
+  {
+    "lat": 36.781237621272005,
+    "lon": -76.45108867063372,
+    "height_m": 14.0,
+    "type": "power_line",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 8.0,
+    "note": "OSM confirmed \u2014 utility corridor"
+  },
+  {
+    "lat": 36.78095016169601,
+    "lon": -76.4506848941783,
+    "height_m": 14.0,
+    "type": "power_line",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 8.0,
+    "note": "OSM confirmed \u2014 utility corridor"
+  },
+  {
+    "lat": 36.78066270212001,
+    "lon": -76.45028111772287,
+    "height_m": 14.0,
+    "type": "power_line",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 8.0,
+    "note": "OSM confirmed \u2014 utility corridor"
+  }
+]

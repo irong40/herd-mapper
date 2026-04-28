@@ -30,7 +30,7 @@ BUILD_DIR = Path(__file__).parent.parent / 'companion_app' / 'dist'
 SAFETY_BUFFER_M  = 8.0
 DEG_PER_M_LAT    = 1 / 111320
 
-app = FastAPI(title='Herd Mapper API', version='1.0.0')
+app = FastAPI(title='Herd Mapper API', version='1.1.0')
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,16 +58,50 @@ def load_json(path: Path):
         return json.load(f)
 
 
-def load_resolutions(mission_id: str) -> dict:
+def load_mission_config(mission_id: str) -> dict:
+    path = DATA_DIR / 'missions' / mission_id / 'config.json'
+    return load_json(path) or {}
+
+
+def load_property_obstacles(property_id: str) -> list | None:
+    path = DATA_DIR / 'properties' / property_id / 'obstacles.json'
+    data = load_json(path)
+    if data is None:
+        return None
+    return data if isinstance(data, list) else data.get('obstacles', [])
+
+
+def load_property_bounds(property_id: str) -> dict | None:
+    return load_json(DATA_DIR / 'properties' / property_id / 'bounds.json')
+
+
+def load_property_lake(property_id: str) -> dict | None:
+    return load_json(DATA_DIR / 'properties' / property_id / 'lake.json')
+
+
+def load_resolutions(mission_id: str, property_id: str | None = None) -> dict:
+    # Property-level resolutions take precedence (persistent across missions)
+    if property_id:
+        path = DATA_DIR / 'properties' / property_id / 'resolutions.json'
+        data = load_json(path)
+        if data is not None:
+            return data
+    # Fallback: legacy mission-scoped resolutions
     path = DATA_DIR / 'resolutions' / f'{mission_id}.json'
     return load_json(path) or {}
 
 
-def save_resolutions(mission_id: str, resolutions: dict):
-    path = DATA_DIR / 'resolutions'
-    path.mkdir(parents=True, exist_ok=True)
-    with open(path / f'{mission_id}.json', 'w') as f:
-        json.dump(resolutions, f, indent=2)
+def save_resolutions(mission_id: str, resolutions: dict, property_id: str | None = None):
+    if property_id:
+        path = DATA_DIR / 'properties' / property_id
+        path.mkdir(parents=True, exist_ok=True)
+        with open(path / 'resolutions.json', 'w') as f:
+            json.dump(resolutions, f, indent=2)
+    else:
+        path = DATA_DIR / 'resolutions'
+        path.mkdir(parents=True, exist_ok=True)
+        with open(path / f'{mission_id}.json', 'w') as f:
+            json.dump(resolutions, f, indent=2)
 
 
 def derive_waypoints(clusters: list, obstacles: list, resolutions: dict) -> list:
@@ -117,49 +151,109 @@ def derive_waypoints(clusters: list, obstacles: list, resolutions: dict) -> list
     return waypoints
 
 
-def build_mission_response(mission_id: str) -> dict:
-    det_path  = DATA_DIR / 'detections' / f'{mission_id}_detections.json'
-    obs_path  = DATA_DIR / 'obstacles'  / f'{mission_id}_obstacles.json'
-    bnd_path  = DATA_DIR / 'missions'   / mission_id / 'bounds.json'
-    lake_path = DATA_DIR / 'missions'   / mission_id / 'lake.json'
-
-    detections = load_json(det_path)
-    obs_data   = load_json(obs_path)
-    bounds_raw = load_json(bnd_path)
-    lake_raw   = load_json(lake_path)
-
-    if not detections or not obs_data or not bounds_raw:
-        return None
-
-    resolutions = load_resolutions(mission_id)
-    clusters    = detections['clusters']
-    obstacles   = obs_data if isinstance(obs_data, list) else obs_data.get('obstacles', [])
-    waypoints   = derive_waypoints(clusters, obstacles, resolutions)
-
-    bounds = {
-        'center':  [bounds_raw['center_lat'], bounds_raw['center_lon']],
-        'north':    bounds_raw['north'],
-        'south':    bounds_raw['south'],
-        'east':     bounds_raw['east'],
-        'west':     bounds_raw['west'],
-        'name':     bounds_raw.get('name', mission_id),
+def format_bounds(bounds_raw: dict) -> dict:
+    return {
+        'center': [bounds_raw['center_lat'], bounds_raw['center_lon']],
+        'north':   bounds_raw['north'],
+        'south':   bounds_raw['south'],
+        'east':    bounds_raw['east'],
+        'west':    bounds_raw['west'],
+        'name':    bounds_raw.get('name', ''),
     }
 
-    lake = None
-    if lake_raw:
-        lake = {
-            'center':   [lake_raw['center_lat'], lake_raw['center_lon']],
-            'radius_m':  lake_raw['radius_m'],
-            'label':     lake_raw.get('label', 'Water'),
-        }
+
+def format_lake(lake_raw: dict | None) -> dict | None:
+    if not lake_raw:
+        return None
+    return {
+        'center':   [lake_raw['center_lat'], lake_raw['center_lon']],
+        'radius_m':  lake_raw['radius_m'],
+        'label':     lake_raw.get('label', 'Water'),
+    }
+
+
+def build_scout_response(property_id: str) -> dict | None:
+    """Scout mode: property bounds + obstacles, no detections or waypoints."""
+    bounds_raw  = load_property_bounds(property_id)
+    obstacles   = load_property_obstacles(property_id)
+    lake_raw    = load_property_lake(property_id)
+
+    if not bounds_raw or obstacles is None:
+        return None
+
+    resolutions = load_resolutions(property_id, property_id)
+
+    # AGL range summary for the bottom panel
+    heights = [o['height_m'] for o in obstacles]
+    agl_min = 15
+    agl_max = round(max(heights) + SAFETY_BUFFER_M + 5) if heights else 15
+
+    return {
+        'mission_id':    f'{property_id}_scout',
+        'property_id':   property_id,
+        'mission_type':  'scout',
+        'drone':         'M4E',
+        'status':        'scout_complete',
+        'bounds':        format_bounds(bounds_raw),
+        'lake':          format_lake(lake_raw),
+        'obstacles':     obstacles,
+        'resolutions':   resolutions,
+        'agl_range':     {'min_m': agl_min, 'max_m': agl_max},
+        'obstacle_summary': _obstacle_summary(obstacles),
+    }
+
+
+def build_mission_response(mission_id: str) -> dict | None:
+    config = load_mission_config(mission_id)
+    property_id = config.get('property_id')
+
+    # Load obstacles: property-level first, fallback to legacy path
+    obstacles = None
+    if property_id:
+        obstacles = load_property_obstacles(property_id)
+    if obstacles is None:
+        obs_path = DATA_DIR / 'obstacles' / f'{mission_id}_obstacles.json'
+        obs_data = load_json(obs_path)
+        if obs_data:
+            obstacles = obs_data if isinstance(obs_data, list) else obs_data.get('obstacles', [])
+
+    # Load detections
+    det_path   = DATA_DIR / 'missions' / mission_id / 'detections.json'
+    detections = load_json(det_path)
+    if detections is None:
+        # Legacy path
+        detections = load_json(DATA_DIR / 'detections' / f'{mission_id}_detections.json')
+
+    if not detections or obstacles is None:
+        return None
+
+    # Load bounds + lake: property-level first, fallback to mission-level
+    bounds_raw = None
+    lake_raw   = None
+    if property_id:
+        bounds_raw = load_property_bounds(property_id)
+        lake_raw   = load_property_lake(property_id)
+    if bounds_raw is None:
+        bounds_raw = load_json(DATA_DIR / 'missions' / mission_id / 'bounds.json')
+        lake_raw   = load_json(DATA_DIR / 'missions' / mission_id / 'lake.json')
+
+    if not bounds_raw:
+        return None
+
+    resolutions = load_resolutions(mission_id, property_id)
+    clusters    = detections['clusters']
+    waypoints   = derive_waypoints(clusters, obstacles, resolutions)
 
     return {
         'mission_id':   mission_id,
+        'property_id':  property_id,
+        'mission_type': config.get('mission_type', 'census'),
+        'drone':        config.get('drone', 'M4T'),
         'status':       'pass1_complete',
         'pass1_agl_ft': detections.get('pass1_agl_ft', 200),
         'total_blobs':  detections.get('total_blobs', len(clusters)),
-        'bounds':       bounds,
-        'lake':         lake,
+        'bounds':       format_bounds(bounds_raw),
+        'lake':         format_lake(lake_raw),
         'clusters':     clusters,
         'obstacles':    obstacles,
         'waypoints':    waypoints,
@@ -167,7 +261,22 @@ def build_mission_response(mission_id: str) -> dict:
     }
 
 
+def _obstacle_summary(obstacles: list) -> dict:
+    summary = {}
+    for o in obstacles:
+        summary[o['type']] = summary.get(o['type'], 0) + 1
+    return summary
+
+
 # ── routes ───────────────────────────────────────────────────────────────────
+
+@app.get('/api/scout/{property_id}')
+def get_scout(property_id: str):
+    data = build_scout_response(property_id)
+    if data is None:
+        raise HTTPException(404, f"Property '{property_id}' not found — run: python core/mock_data.py --mode scout")
+    return data
+
 
 @app.get('/api/mission')
 def get_mission(id: str = 'demo'):
@@ -187,19 +296,28 @@ def get_mission_by_id(mission_id: str):
 
 class ResolveRequest(BaseModel):
     obstacle_id: str
-    decision: str   # 'safe' | 'hazard'
+    decision: str              # 'safe' | 'hazard'
     mission_id: Optional[str] = 'demo'
+    property_id: Optional[str] = None
 
 
 @app.post('/api/resolve')
 def resolve_obstacle(req: ResolveRequest):
     if req.decision not in ('safe', 'hazard'):
         raise HTTPException(400, "decision must be 'safe' or 'hazard'")
-    resolutions = load_resolutions(req.mission_id)
+
+    # Determine property_id: from request, or from mission config
+    property_id = req.property_id
+    if not property_id and req.mission_id:
+        config = load_mission_config(req.mission_id)
+        property_id = config.get('property_id')
+
+    resolutions = load_resolutions(req.mission_id, property_id)
     resolutions[req.obstacle_id] = req.decision
-    save_resolutions(req.mission_id, resolutions)
-    # Return updated waypoints so client can sync
-    data = build_mission_response(req.mission_id)
+    save_resolutions(req.mission_id, resolutions, property_id)
+
+    # Return updated waypoints for census missions; empty list for scout
+    data = build_mission_response(req.mission_id) if req.mission_id else None
     return {'ok': True, 'waypoints': data['waypoints'] if data else []}
 
 
@@ -215,7 +333,8 @@ if BUILD_DIR.exists():
 
     @app.get('/{full_path:path}')
     def serve_spa(full_path: str):
-        # Serve index.html for all non-API routes (SPA routing)
+        if full_path.startswith('api/'):
+            raise HTTPException(404, f"API route '/{full_path}' not found")
         index = BUILD_DIR / 'index.html'
         if index.exists():
             return FileResponse(index)

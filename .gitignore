@@ -7,3 +7,4 @@ data/obstacles/
 node_modules/
 dist/
 .venv/
+.claude/

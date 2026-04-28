@@ -1,15 +1,11 @@
 """
-Obstacle mapper: rangefinder telemetry + OSM → property obstacle profile
+The Outer Guard: rangefinder telemetry + OSM -> property obstacle profile
+
+Identifies 'cowans and eavesdroppers' (hazards like power lines, towers, and fences)
+to ensure the airspace is 'duly tiled' for Pass 2 autonomous flight.
 
 Input:  DJI flight log CSV (rangefinder altitude, GPS per frame)
-Output: obstacle map JSON with classified hazards and confidence tiers
-
-Obstacle types detected:
-  - Tree canopy / vegetation (broad returns)
-  - Buildings / structures (dense rectangular returns)
-  - Fence lines (post pattern: consistent spacing, low height, linear)
-  - Power line corridors (pole pattern: consistent spacing, taller, linear + OSM confirm)
-  - Towers / guy wire hazards (tall narrow isolated return → exclusion cone)
+Output: Tiled airspace JSON with classified hazards and confidence tiers
 """
 
 import json
@@ -25,13 +21,14 @@ GUY_WIRE_CONE_FACTOR = 1.5   # exclusion radius = tower_height * this
 POLE_SPACING_MIN_M = 30
 POLE_SPACING_MAX_M = 320
 POLE_HEIGHT_MIN_M = 8
-TOWER_HEIGHT_MIN_M = 15       # above this + narrow profile → probable tower
+TOWER_HEIGHT_MIN_M = 15       # above this + narrow profile -> probable tower
 MIN_PATTERN_POLES = 3         # need at least 3 to confirm a line
 SAFETY_BUFFER_M = 8           # added to obstacle height for Pass 2 altitude
 
 
 @dataclass
-class Obstacle:
+class Cowan:
+    """A hazard or obstacle detected in the airspace."""
     lat: float
     lon: float
     height_m: float
@@ -39,6 +36,7 @@ class Obstacle:
     confidence: str            # HIGH, MEDIUM, LOW
     exclusion_radius_m: float  # for guy wire cones
     note: str = ''
+    id: str = ''
 
 
 def fetch_osm_power_lines(bounds: dict) -> list[dict]:
@@ -62,27 +60,45 @@ def fetch_osm_power_lines(bounds: dict) -> list[dict]:
 def parse_flight_log(log_path: str) -> list[dict]:
     """
     Parse DJI flight log CSV for rangefinder + GPS readings.
-    Expected columns: timestamp, lat, lon, altitude_agl_m, rangefinder_m
-    Adjust column names to match actual DJI log export format.
+    Expected columns: latitude, longitude, altitude, ultrasonic_height
     """
     import csv
     readings = []
-    with open(log_path) as f:
-        reader = csv.DictReader(f)
+    with open(log_path, encoding='utf-8', errors='ignore') as f:
+        # Some DJI logs have a header skip or different encodings
+        content = f.read()
+        if 'latitude' not in content.lower():
+            # Handle potential metadata lines at start of some DJI CSV exports
+            lines = content.splitlines()
+            for i, line in enumerate(lines):
+                if 'latitude' in line.lower():
+                    content = '\n'.join(lines[i:])
+                    break
+        
+        from io import StringIO
+        reader = csv.DictReader(StringIO(content))
         for row in reader:
             try:
-                readings.append({
-                    'lat': float(row['latitude']),
-                    'lon': float(row['longitude']),
-                    'drone_alt_m': float(row['altitude']),
-                    'rangefinder_m': float(row['ultrasonic_height']),
-                })
+                # Map standard DJI log columns
+                lat = float(row.get('latitude') or row.get('OSD.latitude') or 0)
+                lon = float(row.get('longitude') or row.get('OSD.longitude') or 0)
+                alt = float(row.get('altitude') or row.get('OSD.height [m]') or 0)
+                # ultrasonic_height is usually rangefinder
+                range_m = float(row.get('ultrasonic_height') or row.get('OSD.ultraHeight [m]') or row.get('rangefinder_m') or alt)
+                
+                if lat != 0 and lon != 0:
+                    readings.append({
+                        'lat': lat,
+                        'lon': lon,
+                        'drone_alt_m': alt,
+                        'rangefinder_m': range_m,
+                    })
             except (KeyError, ValueError):
                 continue
     return readings
 
 
-def obstacle_height(drone_alt_m: float, rangefinder_m: float) -> float:
+def hazard_height(drone_alt_m: float, rangefinder_m: float) -> float:
     """Height of surface hit = drone altitude minus rangefinder reading."""
     return max(0.0, drone_alt_m - rangefinder_m)
 
@@ -133,8 +149,8 @@ def _collinear(p1, p2, p3, tolerance_deg=0.002) -> bool:
     return cross < tolerance_deg
 
 
-def classify_obstacles(readings: list[dict], osm_lines: list[dict]) -> list[Obstacle]:
-    obstacles = []
+def identify_cowans(readings: list[dict], osm_lines: list[dict]) -> list[Cowan]:
+    cowans = []
 
     osm_coords = set()
     for way in osm_lines:
@@ -143,16 +159,17 @@ def classify_obstacles(readings: list[dict], osm_lines: list[dict]) -> list[Obst
                 osm_coords.add((round(node['lat'], 4), round(node['lon'], 4)))
 
     elevated = [
-        {**r, 'height_m': obstacle_height(r['drone_alt_m'], r['rangefinder_m'])}
+        {**r, 'height_m': hazard_height(r['drone_alt_m'], r['rangefinder_m'])}
         for r in readings
-        if obstacle_height(r['drone_alt_m'], r['rangefinder_m']) > 1.0
+        if hazard_height(r['drone_alt_m'], r['rangefinder_m']) > 1.0
     ]
 
     # Towers: tall + isolated
     towers = [e for e in elevated if e['height_m'] >= TOWER_HEIGHT_MIN_M]
-    for t in towers:
+    for t_idx, t in enumerate(towers):
         cone_r = t['height_m'] * GUY_WIRE_CONE_FACTOR
-        obstacles.append(Obstacle(
+        cowans.append(Cowan(
+            id=f'tower_{t_idx}',
             lat=t['lat'], lon=t['lon'],
             height_m=t['height_m'],
             type='tower',
@@ -165,7 +182,7 @@ def classify_obstacles(readings: list[dict], osm_lines: list[dict]) -> list[Obst
     poles = [e for e in elevated if POLE_HEIGHT_MIN_M <= e['height_m'] < TOWER_HEIGHT_MIN_M]
     patterns = detect_pattern(poles, MIN_PATTERN_POLES, POLE_SPACING_MIN_M, POLE_SPACING_MAX_M)
 
-    for pattern in patterns:
+    for p_idx, pattern in enumerate(patterns):
         avg_height = np.mean([p['height_m'] for p in pattern])
         centroid_lat = np.mean([p['lat'] for p in pattern])
         centroid_lon = np.mean([p['lon'] for p in pattern])
@@ -182,8 +199,9 @@ def classify_obstacles(readings: list[dict], osm_lines: list[dict]) -> list[Obst
             obs_type = 'fence_line'
             confidence = 'MEDIUM'
 
-        for p in pattern:
-            obstacles.append(Obstacle(
+        for q_idx, p in enumerate(pattern):
+            cowans.append(Cowan(
+                id=f'{obs_type}_{p_idx}_{q_idx}',
                 lat=p['lat'], lon=p['lon'],
                 height_m=p['height_m'] + SAFETY_BUFFER_M,
                 type=obs_type,
@@ -192,54 +210,57 @@ def classify_obstacles(readings: list[dict], osm_lines: list[dict]) -> list[Obst
                 note='OSM confirmed' if osm_match else 'Pattern inferred'
             ))
 
-    return obstacles
+    return cowans
 
 
-def get_safe_altitude(lat: float, lon: float, obstacles: list[Obstacle], radius_m: float = 50) -> float:
+def get_safe_altitude(lat: float, lon: float, cowans: list[Cowan], radius_m: float = 50) -> float:
     """Return minimum safe Pass 2 altitude for a target coordinate."""
     nearby = [
-        o for o in obstacles
-        if haversine(lat, lon, o.lat, o.lon) <= radius_m
+        c for c in cowans
+        if haversine(lat, lon, c.lat, c.lon) <= radius_m
     ]
     if not nearby:
         return 15.0  # default 15m if no obstacles detected nearby
-    return max(o.height_m for o in nearby) + SAFETY_BUFFER_M
+    return max(c.height_m for c in nearby) + SAFETY_BUFFER_M
 
 
-def run(log_path: str, output_dir: str, bounds: Optional[dict] = None):
+def tile_airspace(log_path: str, output_dir: str, bounds: Optional[dict] = None):
+    """
+    Tiles the mission airspace by identifying hazards and saving a security map.
+    """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    print(f"Parsing flight log: {log_path}")
+    print(f"The Outer Guard is scanning flight log: {log_path}")
     readings = parse_flight_log(log_path)
-    print(f"  {len(readings)} rangefinder readings")
+    print(f"  {len(readings)} telemetry points received")
 
     osm_lines = []
     if bounds:
-        print("Fetching OSM power line data...")
+        print("Consulting OSM for utility corridor confirmation...")
         osm_lines = fetch_osm_power_lines(bounds)
-        print(f"  {len(osm_lines)} OSM power line ways")
+        print(f"  {len(osm_lines)} OSM records integrated")
 
-    obstacles = classify_obstacles(readings, osm_lines)
+    cowans = identify_cowans(readings, osm_lines)
 
     mission_id = Path(log_path).stem
-    out_file = output_path / f"{mission_id}_obstacles.json"
+    out_file = output_path / f"{mission_id}_tiled_airspace.json"
     with open(out_file, 'w') as f:
-        json.dump([asdict(o) for o in obstacles], f, indent=2)
+        json.dump([asdict(c) for c in cowans], f, indent=2)
 
-    high = sum(1 for o in obstacles if o.confidence == 'HIGH')
-    med = sum(1 for o in obstacles if o.confidence == 'MEDIUM')
-    low = sum(1 for o in obstacles if o.confidence == 'LOW')
-    print(f"Obstacles mapped: {len(obstacles)} total — HIGH:{high} MEDIUM:{med} LOW:{low}")
-    print(f"Saved to {out_file}")
-    return obstacles
+    high = sum(1 for c in cowans if c.confidence == 'HIGH')
+    med = sum(1 for c in cowans if c.confidence == 'MEDIUM')
+    low = sum(1 for c in cowans if c.confidence == 'LOW')
+    print(f"Airspace Tiled: {len(cowans)} hazards (Cowans) identified -> HIGH:{high} MEDIUM:{med} LOW:{low}")
+    print(f"Security map saved to {out_file}")
+    return cowans
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='The Outer Guard: Tiling Airspace for Safe Flight')
     parser.add_argument('--log', required=True, help='DJI flight log CSV path')
     parser.add_argument('--output', required=True, help='Output directory')
     parser.add_argument('--bounds', help='JSON string: {"north":..,"south":..,"east":..,"west":..}')
     args = parser.parse_args()
     bounds = json.loads(args.bounds) if args.bounds else None
-    run(args.log, args.output, bounds)
+    tile_airspace(args.log, args.output, bounds)

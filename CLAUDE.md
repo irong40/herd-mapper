@@ -1,14 +1,15 @@
 # Herd Mapper
 
-Adaptive two-pass wildlife census system for SAI. M4T drone flies a thermal grid (Pass 1), detects animal clusters, builds an obstacle map, then autonomously routes to flagged areas for dual-capture investigation (Pass 2). MVP uses two sorties with ground processing between passes. Architecture is designed to slot Manifold 3 onboard later with no structural changes.
+Adaptive two-pass wildlife census system for SAI. M4T drone flies a thermal grid (Pass 1), detects animal clusters, tiles the airspace for hazards (The Outer Guard), then autonomously routes to flagged areas for dual-capture investigation (Pass 2).
 
 ## Current Phase
-**Phase 1 MVP** — two-sortie, ground processing, deer census on M4T
+**Phase 1 MVP** — two-sortie, ground processing, deer census on M4T/M4E
 
 ## Stack
 - **Core processing**: Python 3.12
-- **Companion app**: React + Vite (web app, runs in RC Pro browser, displays on wireless HDMI monitor)
-- **Database**: Supabase (mission logs, detections, obstacle maps)
+- **The Outer Guard**: Hazard mapping & airspace tiling (rangefinder + OSM)
+- **Companion app**: React + Vite (web app, runs in RC Pro browser)
+- **Database**: Supabase (mission logs, detections, tiled airspace)
 - **Species detection**: Wildlife Insights API (deer primary)
 - **Obstacle data**: OSM Overpass API (power lines, structures)
 - **Report output**: SAI Report Builder integration
@@ -17,52 +18,45 @@ Adaptive two-pass wildlife census system for SAI. M4T drone flies a thermal grid
 ## Project Structure
 ```
 core/
-  blob_detector.py        # Thermal image → deer cluster GPS coords
-  obstacle_mapper.py      # Rangefinder data → obstacle profile + pattern inference
-  waypoint_generator.py   # Blob targets + safe altitudes → KMZ for DJI Pilot 2
+  blob_detector.py        # Thermal image -> deer cluster GPS coords
+  outer_guard.py          # The Outer Guard: Tiling airspace (identify Cowans)
+  waypoint_generator.py   # Pass 2 routing using tiled airspace data (Cowans)
   osm_fetcher.py          # Fetch power lines / structures from Overpass API
   species_classifier.py   # Wildlife Insights API wrapper
   report_generator.py     # SAI Report Builder integration
 
 companion_app/            # React web app
   src/
-    Map.jsx               # Live property map with obstacle overlay
-    AlertPanel.jsx        # Confidence-tiered detection alerts
+    Map.jsx               # Live property map with Cowan overlay
+    AlertPanel.jsx        # Confidence-tiered hazard alerts
     TargetQueue.jsx        # Pass 2 waypoints — locked/unlocked status
 
 data/
-  missions/               # Per-mission folders (GPS bounds, KMZ files)
-  obstacles/              # Built obstacle maps (JSON)
+  missions/               # Per-mission folders (GPS bounds, KMZ files, logs)
+  obstacles/              # Tiled airspace data (Cowans)
   detections/             # Thermal + RGB image pairs with tags
 
 docs/                     # ADRs and architecture notes
 tests/
 ```
 
-## Key Design Decisions
-- Two-sortie MVP first, Manifold 3 single-mission later — same codebase, different execution mode
-- Pass 1: 200ft AGL thermal grid, 70% overlap, rangefinder running throughout
-- Pass 2: dynamic waypoints, altitude = max obstacle height in 50ft radius + 25ft buffer
-- Obstacle confidence tiers: HIGH (auto), MEDIUM (soft alert), LOW (hard stop, operator confirm)
-- Guy wire handling: tower detected → 1.5x height exclusion cone, no-fly
-- Companion app is a web app — runs in DJI RC Pro browser, displays on wireless HDMI monitor
-- Species: deer primary, general wildlife secondary
-- Image output: thermal + RGB pair, GPS-embedded, confidence score, "unidentified" tag if below threshold
-
-## Thermal Window (from TTPs)
-- Pre-dawn optimal (1-2 hrs before sunrise)
-- Wind under 10 mph
-- Avoid post-rain (ground warm, deer blend)
-- Temp differential: deer at 98.6°F vs ground ideally 20°F+ cooler
+## The Outer Guard (Terminology)
+- **Tiling**: The process of scanning and securing a mission area for safe flight.
+- **Cowan**: A hazard or obstacle (power lines, towers, etc.) that must be guarded against.
+- **Duly Tiled**: An airspace that has been fully mapped and cleared for autonomous Pass 2 flight.
 
 ## Running
 ```bash
-# After Pass 1 images downloaded from M4T:
+# After Pass 1 images/logs downloaded:
+# 1. Tile the airspace (identify Cowans)
+python core/outer_guard.py --log data/missions/MISSION_ID/flight_log.csv --output data/obstacles/
+
+# 2. Detect animal clusters
 python core/blob_detector.py --mission data/missions/MISSION_ID --output data/detections/
 
-# Generate Pass 2 waypoints:
-python core/waypoint_generator.py --detections data/detections/MISSION_ID --obstacles data/obstacles/MISSION_ID --output data/missions/MISSION_ID/pass2.kmz
+# 3. Generate Pass 2 waypoints (using Cowans for safe altitudes)
+python core/waypoint_generator.py --detections data/detections/MISSION_ID_detections.json --obstacles data/obstacles/MISSION_ID_tiled_airspace.json --output data/missions/MISSION_ID/pass2.kmz
 
-# Companion app:
+# 4. Launch Companion App
 cd companion_app && npm run dev
 ```
