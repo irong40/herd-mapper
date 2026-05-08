@@ -187,6 +187,145 @@ def build_kml(clusters: list[dict], cowans: list[Cowan]) -> str:
     return '\n'.join(kml)
 
 
+def _mapping2d_template_kml(
+    polygon: list[tuple[float, float]],
+    altitude_m: float,
+    speed_ms: float,
+    overlap_pct: float,
+    drone_sub_enum: int,
+    payload_enum: int,
+    payload_lens_index: str,
+    quick_ortho_mapping_pitch: int | None = None,
+) -> str:
+    """Emit a DJI WPML 1.0.x mapping2d template KML for terrain-following Pass 1.
+
+    Verified against developer.dji.com WPML reference (template-kml.html).
+    Drone computes the lawnmower grid from polygon + height + overlap.
+    M4T `surfaceFollowModeEnable=1` provides terrain-follow at constant AGL.
+    """
+    overlap_int = int(round(overlap_pct * 100))
+    coords_str = ' '.join(f'{lon:.7f},{lat:.7f},0' for lat, lon in polygon)
+
+    kml = ['<?xml version="1.0" encoding="UTF-8"?>']
+    kml.append('<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:wpml="http://www.dji.com/wpmz/1.0.6">')
+    kml.append('<Document>')
+    kml.append('<wpml:missionConfig>')
+    kml.append('  <wpml:flyToWaylineMode>safely</wpml:flyToWaylineMode>')
+    kml.append('  <wpml:finishAction>goHome</wpml:finishAction>')
+    kml.append('  <wpml:exitOnRCLost>executeLostAction</wpml:exitOnRCLost>')
+    kml.append('  <wpml:executeRCLostAction>goBack</wpml:executeRCLostAction>')
+    kml.append(f'  <wpml:takeOffSecurityHeight>{TAKEOFF_SECURITY_HEIGHT_M}</wpml:takeOffSecurityHeight>')
+    kml.append(f'  <wpml:globalTransitionalSpeed>{TRANSITIONAL_SPEED_MS}</wpml:globalTransitionalSpeed>')
+    # RTH must clear survey altitude with margin; survey-area Cowans aren't
+    # known yet during pre-flight, so use altitude + RTH buffer.
+    kml.append(f'  <wpml:globalRTHHeight>{altitude_m + RTH_BUFFER_M:.1f}</wpml:globalRTHHeight>')
+    kml.append('  <wpml:droneInfo>')
+    kml.append(f'    <wpml:droneEnumValue>{M4T_DRONE_ENUM}</wpml:droneEnumValue>')
+    kml.append(f'    <wpml:droneSubEnumValue>{drone_sub_enum}</wpml:droneSubEnumValue>')
+    kml.append('  </wpml:droneInfo>')
+    kml.append('  <wpml:payloadInfo>')
+    kml.append(f'    <wpml:payloadEnumValue>{payload_enum}</wpml:payloadEnumValue>')
+    kml.append('    <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>')
+    kml.append('  </wpml:payloadInfo>')
+    kml.append('</wpml:missionConfig>')
+
+    kml.append('<Folder>')
+    kml.append('  <wpml:templateId>0</wpml:templateId>')
+    kml.append('  <wpml:templateType>mapping2d</wpml:templateType>')
+    kml.append('  <wpml:waylineCoordinateSysParam>')
+    kml.append('    <wpml:coordinateMode>WGS84</wpml:coordinateMode>')
+    kml.append('    <wpml:heightMode>relativeToStartPoint</wpml:heightMode>')
+    kml.append('    <wpml:positioningType>GPS</wpml:positioningType>')
+    # surfaceFollowModeEnable: drone uses onboard DEM to maintain constant AGL
+    # over rolling terrain.  Supported on M4E/M4T per template-kml.html.
+    kml.append('    <wpml:surfaceFollowModeEnable>1</wpml:surfaceFollowModeEnable>')
+    kml.append(f'    <wpml:surfaceRelativeHeight>{altitude_m:.1f}</wpml:surfaceRelativeHeight>')
+    kml.append('  </wpml:waylineCoordinateSysParam>')
+    kml.append(f'  <wpml:autoFlightSpeed>{speed_ms}</wpml:autoFlightSpeed>')
+    kml.append('  <wpml:caliFlightEnable>0</wpml:caliFlightEnable>')
+    kml.append('  <wpml:gimbalPitchMode>manual</wpml:gimbalPitchMode>')
+    kml.append('  <wpml:globalUseStraightLine>1</wpml:globalUseStraightLine>')
+
+    # Mission-start: lock gimbal to nadir before survey begins.
+    kml.append('  <wpml:startActionGroup>')
+    kml.append('    <wpml:actionGroupId>0</wpml:actionGroupId>')
+    kml.append('    <wpml:actionGroupStartIndex>0</wpml:actionGroupStartIndex>')
+    kml.append('    <wpml:actionGroupEndIndex>0</wpml:actionGroupEndIndex>')
+    kml.append('    <wpml:actionGroupMode>sequence</wpml:actionGroupMode>')
+    kml.append('    <wpml:actionTrigger>')
+    kml.append('      <wpml:actionTriggerType>reachPoint</wpml:actionTriggerType>')
+    kml.append('    </wpml:actionTrigger>')
+    kml.append('    <wpml:action>')
+    kml.append('      <wpml:actionId>0</wpml:actionId>')
+    kml.append('      <wpml:actionActuatorFunc>gimbalRotate</wpml:actionActuatorFunc>')
+    kml.append('      <wpml:actionActuatorFuncParam>')
+    kml.append('        <wpml:gimbalHeadingYawBase>north</wpml:gimbalHeadingYawBase>')
+    kml.append('        <wpml:gimbalRotateMode>absoluteAngle</wpml:gimbalRotateMode>')
+    kml.append('        <wpml:gimbalPitchRotateEnable>1</wpml:gimbalPitchRotateEnable>')
+    kml.append('        <wpml:gimbalPitchRotateAngle>-90</wpml:gimbalPitchRotateAngle>')
+    kml.append('        <wpml:gimbalRollRotateEnable>0</wpml:gimbalRollRotateEnable>')
+    kml.append('        <wpml:gimbalRollRotateAngle>0</wpml:gimbalRollRotateAngle>')
+    kml.append('        <wpml:gimbalYawRotateEnable>0</wpml:gimbalYawRotateEnable>')
+    kml.append('        <wpml:gimbalYawRotateAngle>0</wpml:gimbalYawRotateAngle>')
+    kml.append('        <wpml:gimbalRotateTimeEnable>0</wpml:gimbalRotateTimeEnable>')
+    kml.append('        <wpml:gimbalRotateTime>0</wpml:gimbalRotateTime>')
+    kml.append('        <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>')
+    kml.append('      </wpml:actionActuatorFuncParam>')
+    kml.append('    </wpml:action>')
+    kml.append('  </wpml:startActionGroup>')
+
+    # Survey polygon — drone computes lawnmower from this.
+    kml.append('  <Placemark>')
+    kml.append('    <Polygon>')
+    kml.append('      <outerBoundaryIs>')
+    kml.append('        <LinearRing>')
+    kml.append(f'          <coordinates>{coords_str}</coordinates>')
+    kml.append('        </LinearRing>')
+    kml.append('      </outerBoundaryIs>')
+    kml.append('    </Polygon>')
+    kml.append('  </Placemark>')
+
+    # Mapping settings.  smartObliqueEnable (legacy P1 oblique pose) is M4E-only
+    # for `quickOrthoMappingEnable`; we emit smartObliqueEnable=0 to be explicit.
+    kml.append(f'  <wpml:height>{altitude_m:.1f}</wpml:height>')
+    kml.append(f'  <wpml:ellipsoidHeight>{altitude_m:.1f}</wpml:ellipsoidHeight>')
+    kml.append('  <wpml:overlap>')
+    kml.append(f'    <wpml:orthoCameraOverlapH>{overlap_int}</wpml:orthoCameraOverlapH>')
+    kml.append(f'    <wpml:orthoCameraOverlapW>{overlap_int}</wpml:orthoCameraOverlapW>')
+    kml.append('  </wpml:overlap>')
+    kml.append('  <wpml:elevationOptimizeEnable>0</wpml:elevationOptimizeEnable>')
+    # smartObliqueEnable: legacy P1-on-M300 oblique pose; never used here.
+    kml.append('  <wpml:smartObliqueEnable>0</wpml:smartObliqueEnable>')
+    # quickOrthoMappingEnable: M4E "Smart Oblique" — gimbal tilts to 3 angles
+    # per pass for richer photogrammetry.  M4E ONLY.  M4T falls through with 0.
+    if quick_ortho_mapping_pitch is not None:
+        kml.append('  <wpml:quickOrthoMappingEnable>1</wpml:quickOrthoMappingEnable>')
+        kml.append(f'  <wpml:quickOrthoMappingPitch>{quick_ortho_mapping_pitch}</wpml:quickOrthoMappingPitch>')
+    else:
+        kml.append('  <wpml:quickOrthoMappingEnable>0</wpml:quickOrthoMappingEnable>')
+    # shootType=distance: drone fires shutter at fixed ground-distance intervals
+    # computed from overlap + height.  Replaces the previous startRecord (video).
+    kml.append('  <wpml:shootType>distance</wpml:shootType>')
+    kml.append('  <wpml:direction>0</wpml:direction>')
+    kml.append('  <wpml:margin>0</wpml:margin>')
+
+    # Payload param: multi-lens capture (wide + thermal).
+    kml.append('  <wpml:payloadParam>')
+    kml.append('    <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>')
+    kml.append('    <wpml:focusMode>firstPoint</wpml:focusMode>')
+    kml.append('    <wpml:meteringMode>average</wpml:meteringMode>')
+    kml.append('    <wpml:dewarpingEnable>0</wpml:dewarpingEnable>')
+    kml.append('    <wpml:returnMode>goHomeWithGimbalDown</wpml:returnMode>')
+    kml.append('    <wpml:useGlobalPayloadLensIndex>0</wpml:useGlobalPayloadLensIndex>')
+    kml.append(f'    <wpml:imageFormat>{payload_lens_index}</wpml:imageFormat>')
+    kml.append('  </wpml:payloadParam>')
+
+    kml.append('</Folder>')
+    kml.append('</Document>')
+    kml.append('</kml>')
+    return '\n'.join(kml)
+
+
 def generate_pass1_grid(
     kml_path: str,
     altitude_m: float = 60.0,
@@ -194,83 +333,48 @@ def generate_pass1_grid(
     overlap_pct: float = 0.75,
     output_path: str = None,
 ) -> bytes:
-    """Generate a Pass 1 thermal grid KMZ from a property boundary KML.
+    """Generate a Pass 1 thermal grid KMZ as a DJI mapping2d mission for M4T.
 
-    Loads the first polygon from kml_path, computes a lawnmower grid within
-    its bounding box at altitude_m, and returns the KMZ bytes.  Writes to
-    output_path if provided.
+    Replaces the prior hand-rolled lawnmower (`templateType=waypoint` +
+    `startRecord` video) with a native DJI mapping2d template:
+      - drone computes optimal grid from polygon + altitude + overlap
+      - `surfaceFollowModeEnable=1` keeps constant AGL over rolling terrain
+      - `shootType=distance` fires interval stills (replaces video)
+      - `imageFormat=wide,ir` captures both lenses on every shot
+      - `gimbalRotate` to -90° before survey starts
+
+    Output structure: `wpmz/template.kml` (DJI's canonical KMZ layout for
+    template missions; Pilot 2 generates waylines on import).
     """
     kml_data = parse_kml(kml_path)
     if not kml_data["polygons"]:
         raise ValueError(f"No polygons found in {kml_path}")
     polygon = kml_data["polygons"][0]
-    min_lat, max_lat, min_lon, max_lon = kml_bbox(polygon)
 
-    # Swath width and row spacing
-    swath_m = 2 * altitude_m * math.tan(math.radians(_M4T_HFOV_DEG / 2))
-    row_spacing_m = swath_m * (1.0 - overlap_pct)
-
-    center_lat = (min_lat + max_lat) / 2.0
-    m_per_lon = METERS_PER_LAT_DEG * math.cos(math.radians(center_lat))
-    row_spacing_lat = row_spacing_m / METERS_PER_LAT_DEG
-
-    rows = []
-    lat = min_lat
-    row_index = 0
-    while lat <= max_lat:
-        if row_index % 2 == 0:
-            rows.append((lat, min_lon))
-            rows.append((lat, max_lon))
-        else:
-            rows.append((lat, max_lon))
-            rows.append((lat, min_lon))
-        lat += row_spacing_lat
-        row_index += 1
-
-    kml_lines = ['<?xml version="1.0" encoding="UTF-8"?>']
-    kml_lines.append('<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:wpml="http://www.dji.com/wpmz/1.0.6">')
-    kml_lines.append('<Document>')
-    kml_lines.append('<wpml:missionConfig>')
-    kml_lines.append('  <wpml:flyToWaylineMode>safely</wpml:flyToWaylineMode>')
-    kml_lines.append('  <wpml:finishAction>goHome</wpml:finishAction>')
-    kml_lines.append('  <wpml:exitOnRCLost>goBack</wpml:exitOnRCLost>')
-    kml_lines.append('</wpml:missionConfig>')
-    kml_lines.append('<Folder>')
-    kml_lines.append('<wpml:templateType>waypoint</wpml:templateType>')
-
-    for i, (lat, lon) in enumerate(rows):
-        kml_lines.append('<Placemark>')
-        kml_lines.append(f'  <Point><coordinates>{lon},{lat},{altitude_m}</coordinates></Point>')
-        kml_lines.append(f'  <wpml:index>{i}</wpml:index>')
-        kml_lines.append(f'  <wpml:executeHeight>{altitude_m:.1f}</wpml:executeHeight>')
-        kml_lines.append(f'  <wpml:waypointSpeed>{speed_ms}</wpml:waypointSpeed>')
-        kml_lines.append('  <wpml:waypointHeadingParam>')
-        kml_lines.append('    <wpml:waypointHeadingMode>smoothTransition</wpml:waypointHeadingMode>')
-        kml_lines.append('  </wpml:waypointHeadingParam>')
-        kml_lines.append('  <wpml:waypointTurnParam>')
-        kml_lines.append('    <wpml:waypointTurnMode>toPointAndStopWithDiscontinuityCurvature</wpml:waypointTurnMode>')
-        kml_lines.append('  </wpml:waypointTurnParam>')
-        kml_lines.append('  <wpml:actionGroup>')
-        kml_lines.append('    <wpml:action><wpml:actionActuatorFunc>startRecord</wpml:actionActuatorFunc></wpml:action>')
-        kml_lines.append('  </wpml:actionGroup>')
-        kml_lines.append('</Placemark>')
-
-    kml_lines.append('</Folder>')
-    kml_lines.append('</Document>')
-    kml_lines.append('</kml>')
-    kml_content = '\n'.join(kml_lines)
+    template_kml = _mapping2d_template_kml(
+        polygon=polygon,
+        altitude_m=altitude_m,
+        speed_ms=speed_ms,
+        overlap_pct=overlap_pct,
+        drone_sub_enum=M4T_DRONE_SUB_ENUM,
+        payload_enum=M4T_PAYLOAD_ENUM,
+        payload_lens_index='wide,ir',
+    )
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as kmz:
-        kmz.writestr('waylines.wpml', kml_content)
+        kmz.writestr('wpmz/template.kml', template_kml)
     kmz_bytes = buf.getvalue()
 
     if output_path:
         out = Path(output_path)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(kmz_bytes)
-        print(f"Pass 1 grid saved to {out} ({len(rows)} waypoints, "
-              f"row spacing {row_spacing_m:.1f}m, altitude {altitude_m:.0f}m)")
+        print(f"Pass 1 mapping2d KMZ saved to {out}")
+        print(f"  Survey polygon: {len(polygon)} vertices")
+        print(f"  Surface-follow altitude: {altitude_m:.0f}m AGL")
+        print(f"  Overlap: {int(overlap_pct * 100)}% (drone computes grid)")
+        print(f"  Capture: wide + thermal (R-JPEG via drone settings)")
 
     return kmz_bytes
 
