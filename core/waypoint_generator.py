@@ -24,9 +24,20 @@ from sentinel_core.spatial import parse_kml, kml_bbox, METERS_PER_LAT_DEG
 INVESTIGATION_SPEED_MS = 3.0    # m/s — slow for careful imaging
 HOVER_SECONDS = 3               # pause at each target for dual capture
 MIN_INVESTIGATION_ALT_M = 15    # never descend below this regardless of obstacles
+RTH_BUFFER_M = 30               # added above tallest known Cowan for global RTH height
+TAKEOFF_SECURITY_HEIGHT_M = 20  # auto-climb to this before route start (RC-launch min 1.2)
+TRANSITIONAL_SPEED_MS = 5.0     # speed between waypoints when not in waypointSpeed scope
 
 # M4T thermal sensor (640×512, ~45° HFOV) swath width at given altitude
 _M4T_HFOV_DEG = 45.0
+
+# DJI Pilot 2 / WPML enums (verified against developer.dji.com WPML reference)
+# M4T = drone 99, sub 1, payload 89.  M4E = drone 99, sub 0, payload 88.
+M4T_DRONE_ENUM = 99
+M4T_DRONE_SUB_ENUM = 1
+M4T_PAYLOAD_ENUM = 89
+M4E_DRONE_SUB_ENUM = 0
+M4E_PAYLOAD_ENUM = 88
 
 
 def load_cowans(path: str) -> list[Cowan]:
@@ -35,15 +46,29 @@ def load_cowans(path: str) -> list[Cowan]:
     return [Cowan(**o) for o in data]
 
 
-def build_kml(clusters: list[dict], cowans: list[Cowan]) -> str:
-    waypoints = []
+def _global_rth_height(waypoints: list[dict], cowans: list[Cowan]) -> float:
+    """Tallest of: max waypoint exec alt, max known Cowan height + RTH buffer."""
+    max_wp = max((wp['alt_m'] for wp in waypoints), default=MIN_INVESTIGATION_ALT_M)
+    max_cowan = max((c.height_m for c in cowans), default=0.0)
+    return max(max_wp, max_cowan + RTH_BUFFER_M)
 
+
+def build_kml(clusters: list[dict], cowans: list[Cowan]) -> str:
+    """Emit Pass 2 cluster-visit KMZ (waylines.wpml content) for M4T.
+
+    Verified against developer.dji.com WPML reference (cloud-api-tutorial,
+    common-element + waylines-wpml, 2026-05-08):
+      - actionGroup requires id, start/end index, mode, actionTrigger
+      - payloadLensIndex is comma-string (`wide,ir`), not an int
+      - startActionGroup at Folder level fires once before route begins
+      - droneEnumValue=99 + droneSubEnumValue=1 disambiguates M4T from M4E
+    """
+    waypoints = []
     for i, cluster in enumerate(clusters):
         safe_alt = max(
             get_safe_altitude(cluster['lat'], cluster['lon'], cowans),
-            MIN_INVESTIGATION_ALT_M
+            MIN_INVESTIGATION_ALT_M,
         )
-
         waypoints.append({
             'index': i,
             'lat': cluster['lat'],
@@ -53,37 +78,108 @@ def build_kml(clusters: list[dict], cowans: list[Cowan]) -> str:
             'confidence': cluster['confidence'],
         })
 
+    rth_height = _global_rth_height(waypoints, cowans)
+
     kml = ['<?xml version="1.0" encoding="UTF-8"?>']
     kml.append('<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:wpml="http://www.dji.com/wpmz/1.0.6">')
     kml.append('<Document>')
     kml.append('<wpml:missionConfig>')
-    kml.append(f'  <wpml:flyToWaylineMode>safely</wpml:flyToWaylineMode>')
-    kml.append(f'  <wpml:finishAction>goHome</wpml:finishAction>')
-    kml.append(f'  <wpml:exitOnRCLost>goBack</wpml:exitOnRCLost>')
+    kml.append('  <wpml:flyToWaylineMode>safely</wpml:flyToWaylineMode>')
+    kml.append('  <wpml:finishAction>goHome</wpml:finishAction>')
+    kml.append('  <wpml:exitOnRCLost>executeLostAction</wpml:exitOnRCLost>')
+    kml.append('  <wpml:executeRCLostAction>goBack</wpml:executeRCLostAction>')
+    kml.append(f'  <wpml:takeOffSecurityHeight>{TAKEOFF_SECURITY_HEIGHT_M}</wpml:takeOffSecurityHeight>')
+    kml.append(f'  <wpml:globalTransitionalSpeed>{TRANSITIONAL_SPEED_MS}</wpml:globalTransitionalSpeed>')
+    kml.append(f'  <wpml:globalRTHHeight>{rth_height:.1f}</wpml:globalRTHHeight>')
+    kml.append(f'  <wpml:droneInfo>')
+    kml.append(f'    <wpml:droneEnumValue>{M4T_DRONE_ENUM}</wpml:droneEnumValue>')
+    kml.append(f'    <wpml:droneSubEnumValue>{M4T_DRONE_SUB_ENUM}</wpml:droneSubEnumValue>')
+    kml.append(f'  </wpml:droneInfo>')
+    kml.append(f'  <wpml:payloadInfo>')
+    kml.append(f'    <wpml:payloadEnumValue>{M4T_PAYLOAD_ENUM}</wpml:payloadEnumValue>')
+    kml.append(f'    <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>')
+    kml.append(f'  </wpml:payloadInfo>')
     kml.append('</wpml:missionConfig>')
+
     kml.append('<Folder>')
-    kml.append('<wpml:templateType>waypoint</wpml:templateType>')
+    kml.append('  <wpml:templateId>0</wpml:templateId>')
+    kml.append('  <wpml:waylineId>0</wpml:waylineId>')
+    kml.append('  <wpml:templateType>waypoint</wpml:templateType>')
+    kml.append('  <wpml:executeHeightMode>relativeToStartPoint</wpml:executeHeightMode>')
+    kml.append(f'  <wpml:autoFlightSpeed>{INVESTIGATION_SPEED_MS}</wpml:autoFlightSpeed>')
+
+    # Mission-start: lock gimbal to nadir before first waypoint.
+    kml.append('  <wpml:startActionGroup>')
+    kml.append('    <wpml:actionGroupId>0</wpml:actionGroupId>')
+    kml.append('    <wpml:actionGroupStartIndex>0</wpml:actionGroupStartIndex>')
+    kml.append('    <wpml:actionGroupEndIndex>0</wpml:actionGroupEndIndex>')
+    kml.append('    <wpml:actionGroupMode>sequence</wpml:actionGroupMode>')
+    kml.append('    <wpml:actionTrigger>')
+    kml.append('      <wpml:actionTriggerType>reachPoint</wpml:actionTriggerType>')
+    kml.append('    </wpml:actionTrigger>')
+    kml.append('    <wpml:action>')
+    kml.append('      <wpml:actionId>0</wpml:actionId>')
+    kml.append('      <wpml:actionActuatorFunc>gimbalRotate</wpml:actionActuatorFunc>')
+    kml.append('      <wpml:actionActuatorFuncParam>')
+    kml.append('        <wpml:gimbalHeadingYawBase>north</wpml:gimbalHeadingYawBase>')
+    kml.append('        <wpml:gimbalRotateMode>absoluteAngle</wpml:gimbalRotateMode>')
+    kml.append('        <wpml:gimbalPitchRotateEnable>1</wpml:gimbalPitchRotateEnable>')
+    kml.append('        <wpml:gimbalPitchRotateAngle>-90</wpml:gimbalPitchRotateAngle>')
+    kml.append('        <wpml:gimbalRollRotateEnable>0</wpml:gimbalRollRotateEnable>')
+    kml.append('        <wpml:gimbalRollRotateAngle>0</wpml:gimbalRollRotateAngle>')
+    kml.append('        <wpml:gimbalYawRotateEnable>0</wpml:gimbalYawRotateEnable>')
+    kml.append('        <wpml:gimbalYawRotateAngle>0</wpml:gimbalYawRotateAngle>')
+    kml.append('        <wpml:gimbalRotateTimeEnable>0</wpml:gimbalRotateTimeEnable>')
+    kml.append('        <wpml:gimbalRotateTime>0</wpml:gimbalRotateTime>')
+    kml.append('        <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>')
+    kml.append('      </wpml:actionActuatorFuncParam>')
+    kml.append('    </wpml:action>')
+    kml.append('  </wpml:startActionGroup>')
 
     for wp in waypoints:
-        kml.append(f'<Placemark>')
+        kml.append('<Placemark>')
         kml.append(f'  <Point><coordinates>{wp["lon"]},{wp["lat"]},{wp["alt_m"]}</coordinates></Point>')
         kml.append(f'  <wpml:index>{wp["index"]}</wpml:index>')
         kml.append(f'  <wpml:executeHeight>{wp["alt_m"]:.1f}</wpml:executeHeight>')
         kml.append(f'  <wpml:waypointSpeed>{INVESTIGATION_SPEED_MS}</wpml:waypointSpeed>')
-        kml.append(f'  <wpml:waypointHeadingParam>')
-        kml.append(f'    <wpml:waypointHeadingMode>smoothTransition</wpml:waypointHeadingMode>')
-        kml.append(f'  </wpml:waypointHeadingParam>')
-        kml.append(f'  <wpml:waypointTurnParam>')
-        kml.append(f'    <wpml:waypointTurnMode>toPointAndStopWithDiscontinuityCurvature</wpml:waypointTurnMode>')
-        kml.append(f'  </wpml:waypointTurnParam>')
-        kml.append(f'  <wpml:actionGroup>')
-        kml.append(f'    <wpml:action><wpml:actionActuatorFunc>takePhoto</wpml:actionActuatorFunc></wpml:action>')
-        kml.append(f'    <wpml:action><wpml:actionActuatorFunc>hover</wpml:actionActuatorFunc>'
-                   f'<wpml:actionActuatorFuncParam><wpml:hoverTime>{HOVER_SECONDS}</wpml:hoverTime>'
-                   f'</wpml:actionActuatorFuncParam></wpml:action>')
-        kml.append(f'  </wpml:actionGroup>')
+        kml.append('  <wpml:waypointHeadingParam>')
+        kml.append('    <wpml:waypointHeadingMode>smoothTransition</wpml:waypointHeadingMode>')
+        kml.append('  </wpml:waypointHeadingParam>')
+        kml.append('  <wpml:waypointTurnParam>')
+        kml.append('    <wpml:waypointTurnMode>toPointAndStopWithDiscontinuityCurvature</wpml:waypointTurnMode>')
+        kml.append('  </wpml:waypointTurnParam>')
+
+        # Per-waypoint actionGroup: hover, then dual-lens (wide+thermal) photo.
+        # Single takePhoto with payloadLensIndex=wide,ir captures both files at once.
+        kml.append('  <wpml:actionGroup>')
+        kml.append(f'    <wpml:actionGroupId>{wp["index"] + 1}</wpml:actionGroupId>')
+        kml.append(f'    <wpml:actionGroupStartIndex>{wp["index"]}</wpml:actionGroupStartIndex>')
+        kml.append(f'    <wpml:actionGroupEndIndex>{wp["index"]}</wpml:actionGroupEndIndex>')
+        kml.append('    <wpml:actionGroupMode>sequence</wpml:actionGroupMode>')
+        kml.append('    <wpml:actionTrigger>')
+        kml.append('      <wpml:actionTriggerType>reachPoint</wpml:actionTriggerType>')
+        kml.append('    </wpml:actionTrigger>')
+        kml.append('    <wpml:action>')
+        kml.append('      <wpml:actionId>0</wpml:actionId>')
+        kml.append('      <wpml:actionActuatorFunc>hover</wpml:actionActuatorFunc>')
+        kml.append('      <wpml:actionActuatorFuncParam>')
+        kml.append(f'        <wpml:hoverTime>{HOVER_SECONDS}</wpml:hoverTime>')
+        kml.append('      </wpml:actionActuatorFuncParam>')
+        kml.append('    </wpml:action>')
+        kml.append('    <wpml:action>')
+        kml.append('      <wpml:actionId>1</wpml:actionId>')
+        kml.append('      <wpml:actionActuatorFunc>takePhoto</wpml:actionActuatorFunc>')
+        kml.append('      <wpml:actionActuatorFuncParam>')
+        kml.append('        <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>')
+        kml.append(f'        <wpml:fileSuffix>cluster_{wp["index"]}</wpml:fileSuffix>')
+        kml.append('        <wpml:useGlobalPayloadLensIndex>0</wpml:useGlobalPayloadLensIndex>')
+        kml.append('        <wpml:payloadLensIndex>wide,ir</wpml:payloadLensIndex>')
+        kml.append('      </wpml:actionActuatorFuncParam>')
+        kml.append('    </wpml:action>')
+        kml.append('  </wpml:actionGroup>')
+
         kml.append(f'  <!-- cluster_count:{wp["count"]} confidence:{wp["confidence"]} -->')
-        kml.append(f'</Placemark>')
+        kml.append('</Placemark>')
 
     kml.append('</Folder>')
     kml.append('</Document>')
