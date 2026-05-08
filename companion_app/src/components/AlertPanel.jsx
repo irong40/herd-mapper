@@ -1,10 +1,21 @@
 import { ShieldCheck, ShieldX, CheckCircle, AlertTriangle } from 'lucide-react'
-import { PowerLineIcon, FenceIcon, TowerHazardIcon } from './icons'
+import {
+  PowerLineIcon, FenceIcon, TowerHazardIcon,
+  GuyWireIcon, WaterIcon, VehicleIcon, AntennaIcon,
+  IrrigationPivotIcon, TreeIcon, BuildingIcon,
+} from './icons'
 
 function ObsIcon({ type, size = 15 }) {
-  if (type === 'power_line') return <PowerLineIcon size={size} color="#ef4444" />
-  if (type === 'fence_line') return <FenceIcon size={size} color="#f97316" />
-  if (type === 'tower')      return <TowerHazardIcon size={size} color="#dc2626" />
+  if (type === 'power_line')       return <PowerLineIcon size={size} color="#ef4444" />
+  if (type === 'fence_line')       return <FenceIcon size={size} color="#f97316" />
+  if (type === 'tower')            return <TowerHazardIcon size={size} color="#dc2626" />
+  if (type === 'guy_wire')         return <GuyWireIcon size={size} color="#b91c1c" />
+  if (type === 'water')            return <WaterIcon size={size} color="#0ea5e9" />
+  if (type === 'vehicle')          return <VehicleIcon size={size} color="#f59e0b" />
+  if (type === 'antenna')          return <AntennaIcon size={size} color="#a855f7" />
+  if (type === 'irrigation_pivot') return <IrrigationPivotIcon size={size} color="#84cc16" />
+  if (type === 'tree')             return <TreeIcon size={size} color="#22c55e" />
+  if (type === 'building')         return <BuildingIcon size={size} color="#94a3b8" />
   return null
 }
 
@@ -118,12 +129,33 @@ export default function AlertPanel({ obstacles = [], resolvedObstacles, onResolv
       </div>
 
       {/* Legend */}
-      <div className="px-3 py-2.5 border-t border-slate-800/80">
+      <div className="px-3 py-2.5 border-t border-slate-800/80 overflow-y-auto" style={{ maxHeight: '220px' }}>
         <p className="text-[9px] text-slate-600 font-mono uppercase tracking-widest mb-2">Map Legend</p>
-        <div className="space-y-1.5">
+
+        <p className="text-[8px] text-slate-700 font-mono uppercase tracking-widest mb-1 mt-1">Infrastructure</p>
+        <div className="space-y-1.5 mb-2">
           <LegendRow icon={<PowerLineIcon size={13} color="#ef4444" />} label="Power line corridor" />
           <LegendRow icon={<FenceIcon size={13} color="#f97316" />} label="Fence line posts" />
           <LegendRow icon={<TowerHazardIcon size={13} color="#dc2626" />} label="Tower exclusion zone" />
+          <LegendRow icon={<GuyWireIcon size={13} color="#b91c1c" />} label="Guy wire hazard" />
+          <LegendRow icon={<AntennaIcon size={13} color="#a855f7" />} label="Antenna / comms mast" />
+        </div>
+
+        <p className="text-[8px] text-slate-700 font-mono uppercase tracking-widest mb-1">Terrain</p>
+        <div className="space-y-1.5 mb-2">
+          <LegendRow icon={<WaterIcon size={13} color="#0ea5e9" />} label="Water / wet area" />
+          <LegendRow icon={<TreeIcon size={13} color="#22c55e" />} label="Tree / canopy" />
+          <LegendRow icon={<BuildingIcon size={13} color="#94a3b8" />} label="Building footprint" />
+          <LegendRow icon={<IrrigationPivotIcon size={13} color="#84cc16" />} label="Irrigation pivot radius" />
+        </div>
+
+        <p className="text-[8px] text-slate-700 font-mono uppercase tracking-widest mb-1">Moving</p>
+        <div className="space-y-1.5 mb-2">
+          <LegendRow icon={<VehicleIcon size={13} color="#f59e0b" />} label="Vehicle — moving hazard" />
+        </div>
+
+        <p className="text-[8px] text-slate-700 font-mono uppercase tracking-widest mb-1">Detection</p>
+        <div className="space-y-1.5">
           <LegendRow dot="#22c55e" label="HIGH confidence cluster" />
           <LegendRow dot="#f59e0b" label="MEDIUM confidence cluster" />
           <LegendRow dot="#818cf8" label="Pass 2 waypoint" />

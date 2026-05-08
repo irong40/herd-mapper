@@ -136,3 +136,114 @@ export function CheckReadyIcon({ size = 16, color = 'currentColor', className = 
     </svg>
   )
 }
+
+// --- Obstacle class icons added for 10-type Cowan system ---
+
+export function GuyWireIcon({ size = 20, color = 'currentColor', className = '' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      {/* Anchor point at top-center */}
+      <circle cx="12" cy="5" r="1.5" fill={color} opacity="0.9" />
+      {/* Left guy wire — angled down-left, dashed */}
+      <line x1="12" y1="5" x2="4" y2="20"
+        stroke={color} strokeWidth="1.2" strokeLinecap="round"
+        strokeDasharray="2.5 2" />
+      {/* Right guy wire — angled down-right, dashed */}
+      <line x1="12" y1="5" x2="20" y2="20"
+        stroke={color} strokeWidth="1.2" strokeLinecap="round"
+        strokeDasharray="2.5 2" />
+      {/* Ground anchors */}
+      <line x1="2" y1="20" x2="6" y2="20" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="18" y1="20" x2="22" y2="20" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function WaterIcon({ size = 20, color = 'currentColor', className = '' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      {/* First wave */}
+      <path d="M3 11 Q6 8 9 11 Q12 14 15 11 Q18 8 21 11"
+        stroke={color} strokeWidth="1.6" strokeLinecap="round" fill="none" />
+      {/* Second wave */}
+      <path d="M3 16 Q6 13 9 16 Q12 19 15 16 Q18 13 21 16"
+        stroke={color} strokeWidth="1.6" strokeLinecap="round" fill="none" />
+    </svg>
+  )
+}
+
+export function VehicleIcon({ size = 20, color = 'currentColor', className = '' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      {/* Vehicle body — rounded rect, top-down */}
+      <rect x="7" y="5" width="10" height="14" rx="2.5"
+        stroke={color} strokeWidth="1.6" fill={color} fillOpacity="0.15" />
+      {/* Wheels — 4 corners */}
+      <rect x="4" y="6" width="3" height="4" rx="1" fill={color} opacity="0.8" />
+      <rect x="17" y="6" width="3" height="4" rx="1" fill={color} opacity="0.8" />
+      <rect x="4" y="14" width="3" height="4" rx="1" fill={color} opacity="0.8" />
+      <rect x="17" y="14" width="3" height="4" rx="1" fill={color} opacity="0.8" />
+      {/* Windshield line */}
+      <line x1="8" y1="8" x2="16" y2="8" stroke={color} strokeWidth="1" strokeLinecap="round" opacity="0.6" />
+    </svg>
+  )
+}
+
+export function AntennaIcon({ size = 20, color = 'currentColor', className = '' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      {/* Mast */}
+      <line x1="12" y1="3" x2="12" y2="20" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      {/* Signal arcs — one side */}
+      <path d="M15 8 Q18 10.5 15 13" stroke={color} strokeWidth="1.3" strokeLinecap="round" fill="none" opacity="0.9" />
+      <path d="M16.5 5.5 Q21 9 16.5 14.5" stroke={color} strokeWidth="1.1" strokeLinecap="round" fill="none" opacity="0.55" />
+      {/* Base */}
+      <line x1="9" y1="20" x2="15" y2="20" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IrrigationPivotIcon({ size = 20, color = 'currentColor', className = '' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      {/* Center pivot point */}
+      <circle cx="6" cy="12" r="2" fill={color} opacity="0.9" />
+      {/* Pivot arm — horizontal extending right */}
+      <line x1="6" y1="12" x2="21" y2="12" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      {/* Wheel towers under the arm */}
+      <line x1="11" y1="12" x2="11" y2="16" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+      <line x1="16" y1="12" x2="16" y2="16" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
+      {/* Wheel dots */}
+      <circle cx="11" cy="17" r="1.2" fill={color} opacity="0.7" />
+      <circle cx="16" cy="17" r="1.2" fill={color} opacity="0.7" />
+      {/* Arc suggestion — dashed quarter arc */}
+      <path d="M6 3 Q21 3 21 12" stroke={color} strokeWidth="1" strokeLinecap="round"
+        fill="none" strokeDasharray="2.5 2" opacity="0.5" />
+    </svg>
+  )
+}
+
+export function TreeIcon({ size = 20, color = 'currentColor', className = '' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      {/* Top-down canopy circle */}
+      <circle cx="12" cy="12" r="8" stroke={color} strokeWidth="1.5" fill={color} fillOpacity="0.2" />
+      {/* Cross — trunk/branching from above */}
+      <line x1="12" y1="5" x2="12" y2="19" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.8" />
+      <line x1="5" y1="12" x2="19" y2="12" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.8" />
+    </svg>
+  )
+}
+
+export function BuildingIcon({ size = 20, color = 'currentColor', className = '' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      {/* Building footprint — rectangle, top-down */}
+      <rect x="4" y="5" width="16" height="14" rx="1"
+        stroke={color} strokeWidth="1.6" fill={color} fillOpacity="0.18" />
+      {/* X cross — top-down structural marker */}
+      <line x1="4" y1="5" x2="20" y2="19" stroke={color} strokeWidth="1" strokeLinecap="round" opacity="0.5" />
+      <line x1="20" y1="5" x2="4" y2="19" stroke={color} strokeWidth="1" strokeLinecap="round" opacity="0.5" />
+    </svg>
+  )
+}

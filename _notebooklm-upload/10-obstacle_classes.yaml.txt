@@ -1,0 +1,64 @@
+# Herd Mapper — YOLOv8 Obstacle Detection Dataset Config
+# Used by: scripts/train_obstacles.py
+# Inference: core/visual_detector.py (ONNX Runtime — ultralytics not required at runtime)
+#
+# ─── Training Data Sources ────────────────────────────────────────────────────
+# Download via Roboflow Python package:  pip install roboflow
+# See https://universe.roboflow.com for dataset search.
+#
+# Suggested datasets (use roboflow.download('yolov8') format):
+#
+#   power_line    : search "aerial power lines" or "power line detection aerial"
+#                   e.g. "power-line-detection" by author stranded-aerial
+#   tree          : search "aerial tree detection" or "tree canopy detection"
+#                   e.g. "tree-detection-using-aerial-imagery"
+#   building      : search "aerial building detection" (bbox exports)
+#                   Note: many datasets are segmentation — convert masks to bbox
+#                   using roboflow's format conversion or labelme2yolo
+#   vehicle       : search "aerial car detection" or "vehicle detection drone"
+#                   e.g. "aerial-car-detection", "vehicle-detection-from-uav"
+#   water         : search "water body detection aerial" or "pond lake detection"
+#                   e.g. "water-segmentation" (convert to bbox)
+#
+# Classes requiring manual field collection (rare aerial occurrences):
+#   fence_line         : photograph fences from 60-120m AGL, various angles
+#   tower              : telecom/utility towers, various heights
+#   guy_wire           : anchor wires at tower base — difficult, needs high zoom
+#   antenna            : dish and panel antennas on rooftops/towers
+#   irrigation_pivot   : centre-pivot irrigators — distinctive circular shape,
+#                        common in NC/VA agricultural land
+#
+# Recommended annotation tools:
+#   - Roboflow Annotate (cloud, free tier)
+#   - Label Studio (self-hosted, open source)
+#
+# Minimum images per class (recommended):
+#   Common (tree, building, vehicle, water)           : 300+ images
+#   Moderate (fence_line, power_line, tower)          : 150+ images
+#   Rare (guy_wire, antenna, irrigation_pivot)        :  75+ images
+#
+# Data augmentation is handled by ultralytics during training (see train_obstacles.py).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Dataset root (relative to this YAML file — one level up from data/)
+path: ../data/training
+
+# Train / val image subdirectories
+train: images/train
+val:   images/val
+
+# Number of classes
+nc: 10
+
+# Class names — ORDER MATTERS.  Must match CLASS_NAMES in core/visual_detector.py.
+names:
+  0: tree
+  1: building
+  2: fence_line
+  3: power_line
+  4: tower
+  5: guy_wire
+  6: water
+  7: vehicle
+  8: antenna
+  9: irrigation_pivot

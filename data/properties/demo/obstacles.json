@@ -7,7 +7,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-188",
@@ -17,7 +18,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-176",
@@ -27,7 +29,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-164",
@@ -37,7 +40,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-152",
@@ -47,7 +51,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-140",
@@ -57,7 +62,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-128",
@@ -67,7 +73,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-116",
@@ -77,7 +84,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-104",
@@ -87,7 +95,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-92",
@@ -97,7 +106,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-80",
@@ -107,7 +117,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-68",
@@ -117,7 +128,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-56",
@@ -127,7 +139,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-44",
@@ -137,7 +150,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-32",
@@ -147,7 +161,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-20",
@@ -157,7 +172,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_-8",
@@ -167,7 +183,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_4",
@@ -177,7 +194,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_16",
@@ -187,7 +205,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_28",
@@ -197,7 +216,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_40",
@@ -207,7 +227,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_52",
@@ -217,7 +238,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_64",
@@ -227,7 +249,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_76",
@@ -237,7 +260,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_88",
@@ -247,7 +271,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_100",
@@ -257,7 +282,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_112",
@@ -267,7 +293,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_124",
@@ -277,7 +304,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_136",
@@ -287,7 +315,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_148",
@@ -297,7 +326,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_160",
@@ -307,7 +337,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_172",
@@ -317,7 +348,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_184",
@@ -327,7 +359,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_196",
@@ -337,7 +370,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "fence_n_208",
@@ -347,7 +381,8 @@
     "type": "fence_line",
     "confidence": "MEDIUM",
     "exclusion_radius_m": 4.0,
-    "note": "Post pattern inferred \u2014 north boundary"
+    "note": "Post pattern inferred \u2014 north boundary",
+    "source": "rangefinder"
   },
   {
     "id": "power_0",
@@ -357,7 +392,8 @@
     "type": "power_line",
     "confidence": "HIGH",
     "exclusion_radius_m": 8.0,
-    "note": "OSM confirmed \u2014 utility corridor"
+    "note": "OSM confirmed \u2014 utility corridor",
+    "source": "rangefinder"
   },
   {
     "id": "power_1",
@@ -367,7 +403,8 @@
     "type": "power_line",
     "confidence": "HIGH",
     "exclusion_radius_m": 8.0,
-    "note": "OSM confirmed \u2014 utility corridor"
+    "note": "OSM confirmed \u2014 utility corridor",
+    "source": "rangefinder"
   },
   {
     "id": "power_2",
@@ -377,7 +414,8 @@
     "type": "power_line",
     "confidence": "HIGH",
     "exclusion_radius_m": 8.0,
-    "note": "OSM confirmed \u2014 utility corridor"
+    "note": "OSM confirmed \u2014 utility corridor",
+    "source": "rangefinder"
   },
   {
     "id": "power_3",
@@ -387,7 +425,8 @@
     "type": "power_line",
     "confidence": "HIGH",
     "exclusion_radius_m": 8.0,
-    "note": "OSM confirmed \u2014 utility corridor"
+    "note": "OSM confirmed \u2014 utility corridor",
+    "source": "rangefinder"
   },
   {
     "id": "power_4",
@@ -397,7 +436,8 @@
     "type": "power_line",
     "confidence": "HIGH",
     "exclusion_radius_m": 8.0,
-    "note": "OSM confirmed \u2014 utility corridor"
+    "note": "OSM confirmed \u2014 utility corridor",
+    "source": "rangefinder"
   },
   {
     "id": "power_5",
@@ -407,7 +447,8 @@
     "type": "power_line",
     "confidence": "HIGH",
     "exclusion_radius_m": 8.0,
-    "note": "OSM confirmed \u2014 utility corridor"
+    "note": "OSM confirmed \u2014 utility corridor",
+    "source": "rangefinder"
   },
   {
     "id": "power_6",
@@ -417,7 +458,8 @@
     "type": "power_line",
     "confidence": "HIGH",
     "exclusion_radius_m": 8.0,
-    "note": "OSM confirmed \u2014 utility corridor"
+    "note": "OSM confirmed \u2014 utility corridor",
+    "source": "rangefinder"
   },
   {
     "id": "power_7",
@@ -427,7 +469,8 @@
     "type": "power_line",
     "confidence": "HIGH",
     "exclusion_radius_m": 8.0,
-    "note": "OSM confirmed \u2014 utility corridor"
+    "note": "OSM confirmed \u2014 utility corridor",
+    "source": "rangefinder"
   },
   {
     "id": "power_8",
@@ -437,7 +480,8 @@
     "type": "power_line",
     "confidence": "HIGH",
     "exclusion_radius_m": 8.0,
-    "note": "OSM confirmed \u2014 utility corridor"
+    "note": "OSM confirmed \u2014 utility corridor",
+    "source": "rangefinder"
   },
   {
     "id": "power_9",
@@ -447,7 +491,8 @@
     "type": "power_line",
     "confidence": "HIGH",
     "exclusion_radius_m": 8.0,
-    "note": "OSM confirmed \u2014 utility corridor"
+    "note": "OSM confirmed \u2014 utility corridor",
+    "source": "rangefinder"
   },
   {
     "id": "power_10",
@@ -457,7 +502,8 @@
     "type": "power_line",
     "confidence": "HIGH",
     "exclusion_radius_m": 8.0,
-    "note": "OSM confirmed \u2014 utility corridor"
+    "note": "OSM confirmed \u2014 utility corridor",
+    "source": "rangefinder"
   },
   {
     "id": "tower_0",
@@ -467,6 +513,51 @@
     "type": "tower",
     "confidence": "LOW",
     "exclusion_radius_m": 33.0,
-    "note": "Guy wire exclusion cone 33m radius"
+    "note": "Guy wire exclusion cone 33m radius",
+    "source": "rangefinder"
+  },
+  {
+    "id": "guy_wire_0",
+    "lat": 36.782441358246494,
+    "lon": -76.45138028696263,
+    "height_m": 8.0,
+    "type": "guy_wire",
+    "confidence": "LOW",
+    "exclusion_radius_m": 20.0,
+    "note": "Guy wire anchor \u2014 NW stay, inferred from tower_0 proximity",
+    "source": "visual"
+  },
+  {
+    "id": "guy_wire_1",
+    "lat": 36.782144915558746,
+    "lon": -76.4509765105072,
+    "height_m": 8.0,
+    "type": "guy_wire",
+    "confidence": "LOW",
+    "exclusion_radius_m": 20.0,
+    "note": "Guy wire anchor \u2014 SE stay, inferred from tower_0 proximity",
+    "source": "visual"
+  },
+  {
+    "id": "water_0",
+    "lat": 36.781785591088756,
+    "lon": -76.45297296075904,
+    "height_m": 0.0,
+    "type": "water",
+    "confidence": "HIGH",
+    "exclusion_radius_m": 15.0,
+    "note": "Pond edge \u2014 avoid low-altitude passes, surface reflection interferes with rangefinder",
+    "source": "rangefinder"
+  },
+  {
+    "id": "vehicle_0",
+    "lat": 36.780393208767514,
+    "lon": -76.45196351962048,
+    "height_m": 2.5,
+    "type": "vehicle",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 10.0,
+    "note": "Parked equipment near south entrance \u2014 may have moved; verify pre-flight",
+    "source": "visual"
   }
 ]

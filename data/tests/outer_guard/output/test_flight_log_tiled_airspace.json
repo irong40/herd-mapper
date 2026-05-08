@@ -1,0 +1,35 @@
+[
+  {
+    "lat": 36.001,
+    "lon": -76.0,
+    "height_m": 18.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 5.0,
+    "note": "Pattern inferred",
+    "id": "fence_line_0_0",
+    "source": "rangefinder"
+  },
+  {
+    "lat": 36.0015,
+    "lon": -76.0,
+    "height_m": 18.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 5.0,
+    "note": "Pattern inferred",
+    "id": "fence_line_0_1",
+    "source": "rangefinder"
+  },
+  {
+    "lat": 36.002,
+    "lon": -76.0,
+    "height_m": 18.0,
+    "type": "fence_line",
+    "confidence": "MEDIUM",
+    "exclusion_radius_m": 5.0,
+    "note": "Pattern inferred",
+    "id": "fence_line_0_2",
+    "source": "rangefinder"
+  }
+]
