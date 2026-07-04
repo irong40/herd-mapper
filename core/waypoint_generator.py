@@ -14,10 +14,16 @@ Usage:
 import json
 import argparse
 import math
+import sys
 import zipfile
 import io
 from pathlib import Path
-from core.outer_guard import get_safe_altitude, Cowan
+
+# Allow the documented `python core/waypoint_generator.py ...` invocation
+# (same shim as pipeline_runner) in addition to `python -m core.waypoint_generator`.
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.outer_guard import get_safe_altitude, get_waypoint_lock, Cowan
 from sentinel_core.spatial import parse_kml, kml_bbox, METERS_PER_LAT_DEG
 
 
@@ -41,9 +47,51 @@ M4E_PAYLOAD_ENUM = 88
 
 
 def load_cowans(path: str) -> list[Cowan]:
+    """Load Cowans from a tiled-airspace or obstacles JSON file.
+
+    Accepts either a bare list (legacy / mock_data format) or a dict
+    wrapper with a 'cowans' or 'obstacles' key (tile_airspace now writes
+    {'rangefinder_missing': ..., 'cowans': [...]}).
+    """
     with open(path) as f:
         data = json.load(f)
+    if isinstance(data, dict):
+        if data.get('rangefinder_missing'):
+            print(
+                "  *** WARNING: obstacle file is DEGRADED — flight log had no "
+                "rangefinder column; rangefinder hazards are absent. ***"
+            )
+        data = data.get('cowans', data.get('obstacles', []))
     return [Cowan(**o) for o in data]
+
+
+def load_resolutions(
+    resolutions_path: str | None = None,
+    mission_id: str | None = None,
+    property_id: str | None = None,
+    data_dir: str | Path = 'data',
+) -> dict:
+    """Load operator hazard resolutions with the same precedence as
+    api/server.py: explicit path > property-level > legacy mission-level.
+
+    Returns {} when nothing is found — which is the CONSERVATIVE case:
+    with no resolutions, every LOW-confidence obstacle is treated as
+    unresolved and clusters inside its exclusion zone are EXCLUDED from
+    the KMZ (matching the companion app's locked-waypoint rule).
+    """
+    data_dir = Path(data_dir)
+    candidates = []
+    if resolutions_path:
+        candidates.append(Path(resolutions_path))
+    if property_id:
+        candidates.append(data_dir / 'properties' / property_id / 'resolutions.json')
+    if mission_id:
+        candidates.append(data_dir / 'resolutions' / f'{mission_id}.json')
+    for path in candidates:
+        if path.is_file():
+            with open(path) as f:
+                return json.load(f)
+    return {}
 
 
 def _global_rth_height(waypoints: list[dict], cowans: list[Cowan]) -> float:
@@ -53,8 +101,68 @@ def _global_rth_height(waypoints: list[dict], cowans: list[Cowan]) -> float:
     return max(max_wp, max_cowan + RTH_BUFFER_M)
 
 
-def build_kml(clusters: list[dict], cowans: list[Cowan]) -> str:
+def plan_waypoints(
+    clusters: list[dict],
+    cowans: list[Cowan],
+    resolutions: dict | None = None,
+) -> tuple[list[dict], list[dict]]:
+    """Compute flyable Pass 2 waypoints, enforcing the SAME safety gates as
+    the companion app (api/server.py):
+
+    - Altitude: core.outer_guard.get_safe_altitude — the single shared
+      function, so the KMZ executeHeight is identical to the UI value.
+    - Locking:  core.outer_guard.get_waypoint_lock — clusters locked by an
+      unresolved or hazard-confirmed LOW-confidence obstacle are EXCLUDED
+      from the KMZ entirely.  The flown artifact must never visit a
+      waypoint the UI shows as locked.
+
+    Returns (flyable_waypoints, excluded) where excluded entries carry
+    'locked_by' / 'lock_reason' for operator display.
+    """
+    resolutions = resolutions or {}
+    waypoints = []
+    excluded = []
+    for cluster in clusters:
+        locked_by, lock_reason = get_waypoint_lock(
+            cluster['lat'], cluster['lon'], cowans, resolutions
+        )
+        if locked_by is not None:
+            excluded.append({
+                'lat': cluster['lat'],
+                'lon': cluster['lon'],
+                'count': cluster.get('count'),
+                'id': cluster.get('id', ''),
+                'locked_by': locked_by,
+                'lock_reason': lock_reason,
+            })
+            continue
+        safe_alt = max(
+            get_safe_altitude(cluster['lat'], cluster['lon'], cowans),
+            MIN_INVESTIGATION_ALT_M,
+        )
+        waypoints.append({
+            'index': len(waypoints),
+            'lat': cluster['lat'],
+            'lon': cluster['lon'],
+            'alt_m': safe_alt,
+            'count': cluster['count'],
+            'confidence': cluster['confidence'],
+        })
+    return waypoints, excluded
+
+
+def build_kml(
+    clusters: list[dict],
+    cowans: list[Cowan],
+    resolutions: dict | None = None,
+) -> str:
     """Emit Pass 2 cluster-visit KMZ (waylines.wpml content) for M4T.
+
+    SAFETY: clusters locked under the companion-app rules (unresolved or
+    hazard-confirmed LOW-confidence obstacles — see plan_waypoints) are
+    excluded from the emitted route.  Passing resolutions=None means "no
+    operator resolutions", which locks every cluster near a LOW-confidence
+    obstacle (conservative default).
 
     Verified against developer.dji.com WPML reference (cloud-api-tutorial,
     common-element + waylines-wpml, 2026-05-08):
@@ -63,20 +171,13 @@ def build_kml(clusters: list[dict], cowans: list[Cowan]) -> str:
       - startActionGroup at Folder level fires once before route begins
       - droneEnumValue=99 + droneSubEnumValue=1 disambiguates M4T from M4E
     """
-    waypoints = []
-    for i, cluster in enumerate(clusters):
-        safe_alt = max(
-            get_safe_altitude(cluster['lat'], cluster['lon'], cowans),
-            MIN_INVESTIGATION_ALT_M,
+    waypoints, excluded = plan_waypoints(clusters, cowans, resolutions)
+    for ex in excluded:
+        print(
+            f"  SAFETY: cluster {ex['id'] or '?'} at "
+            f"{ex['lat']:.5f},{ex['lon']:.5f} EXCLUDED from KMZ — "
+            f"{ex['lock_reason']}. Resolve it in the companion app to include."
         )
-        waypoints.append({
-            'index': i,
-            'lat': cluster['lat'],
-            'lon': cluster['lon'],
-            'alt_m': safe_alt,
-            'count': cluster['count'],
-            'confidence': cluster['confidence'],
-        })
 
     rth_height = _global_rth_height(waypoints, cowans)
 
@@ -379,15 +480,42 @@ def generate_pass1_grid(
     return kmz_bytes
 
 
-def run(detections_path: str, obstacles_path: str, output_path: str):
+def run(
+    detections_path: str,
+    obstacles_path: str,
+    output_path: str,
+    resolutions_path: str | None = None,
+    mission_id: str | None = None,
+    property_id: str | None = None,
+):
     with open(detections_path) as f:
         detection_data = json.load(f)
 
     clusters = detection_data['clusters']
     cowans = load_cowans(obstacles_path) if obstacles_path else []
 
+    # Infer mission_id from the detections file when not given, so the
+    # legacy data/resolutions/{mission_id}.json path can be found.
+    if mission_id is None:
+        mission_id = detection_data.get('mission_id')
+    if property_id is None:
+        property_id = detection_data.get('property_id')
+
+    resolutions = load_resolutions(
+        resolutions_path=resolutions_path,
+        mission_id=mission_id,
+        property_id=property_id,
+    )
+    if not resolutions:
+        print(
+            "  NOTE: no operator resolutions found — any cluster near a "
+            "LOW-confidence obstacle will be EXCLUDED from the KMZ "
+            "(conservative default). Resolve obstacles in the companion app first."
+        )
+
     print(f"Generating Pass 2 waypoints for {len(clusters)} clusters...")
-    kml_content = build_kml(clusters, cowans)
+    waypoints, excluded = plan_waypoints(clusters, cowans, resolutions)
+    kml_content = build_kml(clusters, cowans, resolutions)
 
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -396,15 +524,14 @@ def run(detections_path: str, obstacles_path: str, output_path: str):
         kmz.writestr('waylines.wpml', kml_content)
 
     print(f"Pass 2 waypoints saved to {out}")
+    print(f"  {len(waypoints)} flyable waypoint(s), {len(excluded)} excluded by safety locks")
     print(f"Load into DJI Pilot 2 -> Route Mission -> Import KMZ")
 
-    for i, cluster in enumerate(clusters):
-        safe_alt = max(
-            get_safe_altitude(cluster['lat'], cluster['lon'], cowans),
-            MIN_INVESTIGATION_ALT_M
-        )
-        print(f"  WP{i+1}: {cluster['lat']:.5f},{cluster['lon']:.5f} "
-              f"alt={safe_alt:.0f}m count={cluster['count']} conf={cluster['confidence']}")
+    for wp in waypoints:
+        print(f"  WP{wp['index']+1}: {wp['lat']:.5f},{wp['lon']:.5f} "
+              f"alt={wp['alt_m']:.0f}m count={wp['count']} conf={wp['confidence']}")
+    for ex in excluded:
+        print(f"  LOCKED (not in KMZ): {ex['lat']:.5f},{ex['lon']:.5f} — {ex['lock_reason']}")
 
 
 if __name__ == '__main__':
@@ -412,5 +539,18 @@ if __name__ == '__main__':
     parser.add_argument('--detections', required=True)
     parser.add_argument('--obstacles', required=True)
     parser.add_argument('--output', required=True)
+    parser.add_argument('--resolutions', default=None,
+                        help='Path to resolutions JSON (default: auto-discover from '
+                             'data/properties/{property_id}/resolutions.json or '
+                             'data/resolutions/{mission_id}.json)')
+    parser.add_argument('--mission-id', default=None,
+                        help='Mission ID for resolutions lookup (default: from detections JSON)')
+    parser.add_argument('--property-id', default=None,
+                        help='Property ID for resolutions lookup (default: from detections JSON)')
     args = parser.parse_args()
-    run(args.detections, args.obstacles, args.output)
+    run(
+        args.detections, args.obstacles, args.output,
+        resolutions_path=args.resolutions,
+        mission_id=args.mission_id,
+        property_id=args.property_id,
+    )

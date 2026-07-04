@@ -15,6 +15,7 @@ Usage (field deployment):
 
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -24,10 +25,22 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# SHARED safety logic — the exact same functions compute the altitude the
+# operator sees here and the executeHeight written into the flown KMZ by
+# core/waypoint_generator.py.  Never fork these calculations locally.
+from core.outer_guard import (
+    get_safe_altitude,
+    get_waypoint_lock,
+    SAFETY_BUFFER_M,
+    SAFE_ALT_EXTRA_MARGIN_M,
+    MIN_SAFE_ALT_M,
+)
+
 DATA_DIR  = Path(__file__).parent.parent / 'data'
 BUILD_DIR = Path(__file__).parent.parent / 'companion_app' / 'dist'
 
-SAFETY_BUFFER_M  = 8.0
 DEG_PER_M_LAT    = 1 / 111320
 
 app = FastAPI(title='Herd Mapper API', version='1.1.0')
@@ -54,8 +67,13 @@ def haversine_m(lat1, lon1, lat2, lon2):
 def load_json(path: Path):
     if not path.exists():
         return None
-    with open(path) as f:
-        return json.load(f)
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except json.JSONDecodeError as exc:
+        # A truncated/corrupt file must not 500 every endpoint forever.
+        print(f"WARNING: corrupt JSON at {path}: {exc} — treating as missing")
+        return None
 
 
 def load_mission_config(mission_id: str) -> dict:
@@ -67,8 +85,13 @@ def load_property_obstacles(property_id: str) -> list | None:
     path = DATA_DIR / 'properties' / property_id / 'obstacles.json'
     data = load_json(path)
     if data is None:
+        # Back-compat: scout_processor wrote cowans.json before 2026-07-04
+        data = load_json(DATA_DIR / 'properties' / property_id / 'cowans.json')
+    if data is None:
         return None
-    return data if isinstance(data, list) else data.get('obstacles', [])
+    if isinstance(data, list):
+        return data
+    return data.get('obstacles', data.get('cowans', []))
 
 
 def load_property_bounds(property_id: str) -> dict | None:
@@ -91,17 +114,24 @@ def load_resolutions(mission_id: str, property_id: str | None = None) -> dict:
     return load_json(path) or {}
 
 
+def _write_json_atomic(path: Path, payload) -> None:
+    """Write JSON via temp file + atomic rename — a crash mid-write must
+    never leave truncated safety data (same pattern as pipeline_runner)."""
+    tmp = path.with_suffix('.tmp')
+    with open(tmp, 'w') as f:
+        json.dump(payload, f, indent=2)
+    tmp.replace(path)
+
+
 def save_resolutions(mission_id: str, resolutions: dict, property_id: str | None = None):
     if property_id:
         path = DATA_DIR / 'properties' / property_id
         path.mkdir(parents=True, exist_ok=True)
-        with open(path / 'resolutions.json', 'w') as f:
-            json.dump(resolutions, f, indent=2)
+        _write_json_atomic(path / 'resolutions.json', resolutions)
     else:
         path = DATA_DIR / 'resolutions'
         path.mkdir(parents=True, exist_ok=True)
-        with open(path / f'{mission_id}.json', 'w') as f:
-            json.dump(resolutions, f, indent=2)
+        _write_json_atomic(path / f'{mission_id}.json', resolutions)
 
 
 def derive_waypoints(clusters: list, obstacles: list, resolutions: dict) -> list:
@@ -109,30 +139,15 @@ def derive_waypoints(clusters: list, obstacles: list, resolutions: dict) -> list
     For each cluster, determine Pass 2 safe altitude and locked state.
     A waypoint is locked if any LOW confidence obstacle (not yet resolved safe)
     has its exclusion zone overlapping the cluster position.
+
+    Both calculations delegate to core.outer_guard so the values shown
+    here are IDENTICAL to what waypoint_generator writes into the KMZ.
     """
-    low_obs = [o for o in obstacles if o['confidence'] == 'LOW']
     waypoints = []
 
     for i, c in enumerate(clusters):
-        # Max obstacle height within 60m radius (for safe altitude calc)
-        nearby_heights = [
-            o['height_m']
-            for o in obstacles
-            if haversine_m(c['lat'], c['lon'], o['lat'], o['lon']) < 60
-        ]
-        max_h = max(nearby_heights) if nearby_heights else 0
-        safe_alt = max(15, round(max_h + SAFETY_BUFFER_M + 5))
-
-        # Check for unresolved LOW confidence obstacle overlap
-        locked_by = None
-        lock_reason = None
-        for o in low_obs:
-            dist = haversine_m(c['lat'], c['lon'], o['lat'], o['lon'])
-            if dist < o['exclusion_radius_m'] + 20:  # 20m approach buffer
-                if resolutions.get(o['id']) != 'safe':
-                    locked_by = o['id']
-                    lock_reason = f"{'Confirmed hazard' if resolutions.get(o['id']) == 'hazard' else 'Unresolved'} obstacle nearby ({o['id']})"
-                    break
+        safe_alt = get_safe_altitude(c['lat'], c['lon'], obstacles)
+        locked_by, lock_reason = get_waypoint_lock(c['lat'], c['lon'], obstacles, resolutions)
 
         waypoints.append({
             'id':          c['id'],
@@ -183,10 +198,11 @@ def build_scout_response(property_id: str) -> dict | None:
 
     resolutions = load_resolutions(property_id, property_id)
 
-    # AGL range summary for the bottom panel
-    heights = [o['height_m'] for o in obstacles]
-    agl_min = 15
-    agl_max = round(max(heights) + SAFETY_BUFFER_M + 5) if heights else 15
+    # AGL range summary for the bottom panel (visual detections may carry
+    # height_m=None — treat as 0 rather than crashing the scout view)
+    heights = [o.get('height_m') or 0 for o in obstacles]
+    agl_min = int(MIN_SAFE_ALT_M)
+    agl_max = round(max(heights) + SAFETY_BUFFER_M + SAFE_ALT_EXTRA_MARGIN_M) if heights else int(MIN_SAFE_ALT_M)
 
     return {
         'mission_id':    f'{property_id}_scout',
