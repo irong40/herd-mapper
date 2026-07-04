@@ -44,16 +44,25 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.visual_detector import detect_from_folder
 from core.outer_guard import tile_airspace, haversine
 
-# blob_detector.py may or may not have a single-image entrypoint — we call
-# it via its public interface if available, else skip gracefully.
-try:
-    from core.blob_detector import detect_blobs_single  # type: ignore[import]
-    BLOB_SINGLE_AVAILABLE = True
-except (ImportError, AttributeError):
-    BLOB_SINGLE_AVAILABLE = False
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s  %(levelname)s  %(message)s')
 logger = logging.getLogger('pipeline_runner')
+
+# Thermal blob detection (core/blob_detector.py).  If this import fails
+# (e.g. sentinel-core or OpenCV missing) the pipeline CANNOT produce deer
+# clusters — that must be LOUD, never silent: we log an error here, set an
+# error flag in status.json, and print an error banner at finalize.
+try:
+    from core.blob_detector import detect_blobs_geo, cluster_detections, CLUSTER_RADIUS_M
+    BLOB_DETECTOR_AVAILABLE = True
+    BLOB_IMPORT_ERROR: str | None = None
+except Exception as _blob_exc:  # ImportError or transitive dependency failure
+    BLOB_DETECTOR_AVAILABLE = False
+    BLOB_IMPORT_ERROR = f'blob_detector import failed: {_blob_exc!r}'
+    logger.error(
+        "PIPELINE DEGRADED — %s. Thermal blob detection WILL NOT RUN; "
+        "no deer clusters will be produced. Fix the import before flying.",
+        BLOB_IMPORT_ERROR,
+    )
 
 # ── Constants ────────────────────────────────────────────────────────────────
 IDLE_TIMEOUT_S    = 30   # declare pass complete after N seconds of no new images
@@ -63,31 +72,54 @@ IMAGE_EXTS        = {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp'}
 
 # ── Status helpers ───────────────────────────────────────────────────────────
 
-def _write_status(status_path: Path, status: str, processed: int, total: int) -> None:
+def _write_json_atomic(path: Path, payload) -> None:
+    """Write JSON via temp file + atomic rename (crash-safe)."""
+    tmp = path.with_suffix('.tmp')
+    with open(tmp, 'w') as f:
+        json.dump(payload, f, indent=2, default=str)
+    tmp.replace(path)  # atomic rename
+
+
+def _write_status(
+    status_path: Path, status: str, processed: int, total: int,
+    error: str | None = None,
+) -> None:
     payload = {
         'status':       status,
         'processed':    processed,
         'total':        total,
-        'last_updated': datetime.datetime.utcnow().isoformat() + 'Z',
+        'error':        error,
+        'last_updated': datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
-    tmp = status_path.with_suffix('.tmp')
-    with open(tmp, 'w') as f:
-        json.dump(payload, f, indent=2)
-    tmp.replace(status_path)  # atomic rename
+    _write_json_atomic(status_path, payload)
 
 
-def _write_detections(mission_dir: Path, detections: list[dict]) -> None:
-    out = mission_dir / 'detections.json'
-    with open(out, 'w') as f:
-        json.dump(detections, f, indent=2, default=str)
+def _write_detections(mission_dir: Path, mission_id: str, blobs: list[dict], clusters: list[dict]) -> None:
+    """Persist detections.json in the schema api/server.py consumes.
+
+    MUST match blob_detector.run / mock_data.generate_detections:
+    a dict with a 'clusters' key — NOT a raw blob list (server.py reads
+    detections['clusters'] and derive_waypoints needs id/lat/lon/count/
+    confidence per cluster).
+    """
+    payload = {
+        'mission_id':  mission_id,
+        'total_blobs': len(blobs),
+        'clusters':    clusters,
+    }
+    _write_json_atomic(mission_dir / 'detections.json', payload)
 
 
-def _write_obstacles(mission_dir: Path, cowans: list) -> None:
+def _write_obstacles(mission_dir: Path, mission_id: str, cowans: list) -> None:
     from dataclasses import asdict
-    out = mission_dir / 'obstacles.json'
     raw = [asdict(c) if hasattr(c, '__dataclass_fields__') else c for c in cowans]
-    with open(out, 'w') as f:
-        json.dump(raw, f, indent=2, default=str)
+    _write_json_atomic(mission_dir / 'obstacles.json', raw)
+    # Also write the legacy path api/server.py falls back to when the mission
+    # has no property-level obstacles (data/obstacles/{id}_obstacles.json) so
+    # pipeline output is actually reachable by the companion app.
+    legacy_dir = mission_dir.parent.parent / 'obstacles'
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+    _write_json_atomic(legacy_dir / f'{mission_id}_obstacles.json', raw)
 
 
 # ── Core processing ──────────────────────────────────────────────────────────
@@ -111,10 +143,18 @@ class MissionProcessor:
 
         self.processed_images: list[Path] = []
         self.blob_detections:  list[dict] = []
+        self.clusters:         list[dict] = []
         self.visual_cowans:    list[dict] = []
         self.all_cowans:       list       = []
+        self.error: str | None = BLOB_IMPORT_ERROR
 
-        _write_status(self.status_path, 'waiting_for_images', 0, 0)
+        if not BLOB_DETECTOR_AVAILABLE:
+            logger.error(
+                "Mission '%s' starting WITHOUT thermal blob detection — %s",
+                mission_id, BLOB_IMPORT_ERROR,
+            )
+
+        _write_status(self.status_path, 'waiting_for_images', 0, 0, error=self.error)
 
     def accept_image(self, src_path: Path) -> None:
         """Copy an incoming image into the mission images dir and run blob detection."""
@@ -125,18 +165,20 @@ class MissionProcessor:
         shutil.copy2(src_path, dest)
         self.processed_images.append(dest)
 
-        # Single-image blob detection (thermal) if available
-        if BLOB_SINGLE_AVAILABLE:
+        # Single-image thermal blob detection (georeferenced blobs)
+        if BLOB_DETECTOR_AVAILABLE:
             try:
-                blobs = detect_blobs_single(str(dest))
+                blobs = detect_blobs_geo(str(dest))
                 if blobs:
                     self.blob_detections.extend(blobs)
             except Exception as exc:
-                logger.warning("blob_detector single-image failed for %s: %s", dest.name, exc)
+                logger.error("blob detection failed for %s: %s", dest.name, exc)
+                self.error = f'blob detection failed for {dest.name}: {exc}'
 
         _write_status(
             self.status_path, 'processing',
-            len(self.processed_images), len(self.processed_images)
+            len(self.processed_images), len(self.processed_images),
+            error=self.error,
         )
         self._print_progress()
 
@@ -175,8 +217,13 @@ class MissionProcessor:
             )
             self.all_cowans = []
 
-        _write_detections(self.mission_dir, self.blob_detections)
-        _write_obstacles(self.mission_dir, self.all_cowans)
+        # Cluster raw georeferenced blobs into herd centroids — the schema
+        # api/server.py and waypoint_generator consume.
+        if BLOB_DETECTOR_AVAILABLE:
+            self.clusters = cluster_detections(self.blob_detections, CLUSTER_RADIUS_M)
+
+        _write_detections(self.mission_dir, self.mission_id, self.blob_detections, self.clusters)
+        _write_obstacles(self.mission_dir, self.mission_id, self.all_cowans)
         self._print_progress()
 
     def finalize(self) -> None:
@@ -184,23 +231,31 @@ class MissionProcessor:
         self.process_batch()
         _write_status(
             self.status_path, 'pass1_complete',
-            len(self.processed_images), len(self.processed_images)
+            len(self.processed_images), len(self.processed_images),
+            error=self.error,
         )
         print(
             f"\nPipeline: PASS 1 COMPLETE — mission '{self.mission_id}'\n"
             f"  {len(self.processed_images)} images processed\n"
-            f"  {len(self.blob_detections)} blob detections\n"
+            f"  {len(self.blob_detections)} blob detections -> {len(self.clusters)} clusters\n"
             f"  {len(self.all_cowans)} obstacles in tiled airspace\n"
             f"  Results: {self.mission_dir}"
         )
+        if self.error:
+            print(
+                f"\n  *** PIPELINE ERROR — RESULTS INCOMPLETE ***\n"
+                f"  {self.error}\n"
+                f"  Do NOT plan Pass 2 from this mission until resolved.\n"
+            )
 
     def _print_progress(self) -> None:
-        n_images   = len(self.processed_images)
-        n_clusters = len(self.blob_detections)
+        n_images    = len(self.processed_images)
+        n_blobs     = len(self.blob_detections)
+        n_clusters  = len(self.clusters)
         n_obstacles = len(self.all_cowans)
         print(
             f"Pipeline: {n_images} images processed, "
-            f"{n_clusters} clusters, "
+            f"{n_blobs} blobs ({n_clusters} clusters), "
             f"{n_obstacles} obstacles"
         )
 
