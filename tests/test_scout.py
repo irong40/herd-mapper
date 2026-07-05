@@ -166,6 +166,24 @@ class TestScoutProcessorMockMode(unittest.TestCase):
                          "Mock mode (no ONNX model) yields zero detections")
         self.assertEqual(record['image_count'], 1)
         self.assertTrue(Path(record['output_path']).is_file())
+        self.assertEqual(
+            Path(record['output_path']).name, 'obstacles.json',
+            "Scout must persist to obstacles.json — the file the API serves "
+            "(cowans.json was never read by api/server.py)"
+        )
+
+    def test_legacy_cowans_json_still_loadable(self):
+        """Back-compat: pre-2026-07-04 caches used cowans.json + 'cowans' key."""
+        legacy_dir = self.output_root / 'legacy_prop'
+        legacy_dir.mkdir(parents=True)
+        (legacy_dir / 'cowans.json').write_text(json.dumps({
+            'property_id': 'legacy_prop',
+            'last_scouted': '2026-01-01T00:00:00+00:00',
+            'cowans': [{'id': 'x', 'type': 'tower'}],
+        }))
+        loaded = load_cached_cowans('legacy_prop', root=str(self.output_root))
+        self.assertIsNotNone(loaded)
+        self.assertEqual(len(loaded['obstacles']), 1)
 
     def test_persisted_record_loadable(self):
         process_scout_imagery(
@@ -178,7 +196,7 @@ class TestScoutProcessorMockMode(unittest.TestCase):
         self.assertIsNotNone(loaded)
         self.assertEqual(loaded['property_id'], 'demo')
         self.assertIn('last_scouted', loaded)
-        self.assertIsInstance(loaded['cowans'], list)
+        self.assertIsInstance(loaded['obstacles'], list)
 
     def test_persisted_record_has_no_internal_fields(self):
         process_scout_imagery(
@@ -188,7 +206,7 @@ class TestScoutProcessorMockMode(unittest.TestCase):
             output_root=str(self.output_root),
         )
         loaded = load_cached_cowans('demo', root=str(self.output_root))
-        for cowan in loaded['cowans']:
+        for cowan in loaded['obstacles']:
             for key in cowan:
                 self.assertFalse(
                     key.startswith('_'),

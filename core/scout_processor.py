@@ -6,7 +6,8 @@ Pipeline:
     → Smart Oblique RGB images on SD card
     → Quick Transfer to laptop
     → THIS MODULE
-    → data/properties/{property_id}/cowans.json (persistent Cowan cache)
+    → data/properties/{property_id}/obstacles.json (persistent Cowan cache —
+      the file api/server.py:load_property_obstacles reads)
 
 Workflow:
   1. Run visual_detector.detect_from_folder on captured images.
@@ -15,8 +16,9 @@ Workflow:
       True ground projection via gimbal pitch/yaw + altitude is a Phase 2
       enhancement; 50m proximity merge with rangefinder Cowans tolerates this.)
   3. Strip internal-only fields (`_bbox`, `_image_path`).
-  4. Persist to `data/properties/{property_id}/cowans.json` with
-     `last_scouted` ISO timestamp.
+  4. Persist to `data/properties/{property_id}/obstacles.json` with
+     `last_scouted` ISO timestamp and an `obstacles` list — the exact
+     path + format the API serves to the companion app.
 
 Companion app reads the persistence file and surfaces a "scout
 freshness" badge — if `last_scouted` is older than 6 months OR the
@@ -110,7 +112,7 @@ def process_scout_imagery(
           'last_scouted': ISO 8601 UTC timestamp,
           'image_count': int,
           'cowan_count': int,
-          'cowans': list[dict],
+          'obstacles': list[dict],
           'output_path': str,
         }
     """
@@ -141,14 +143,19 @@ def process_scout_imagery(
         'last_scouted': datetime.now(timezone.utc).isoformat(),
         'image_count': len(image_files),
         'cowan_count': len(persistable),
-        'cowans': persistable,
+        'obstacles': persistable,
     }
 
     out_dir = Path(output_root) / property_id
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_file = out_dir / 'cowans.json'
-    with open(out_file, 'w') as f:
+    # obstacles.json is THE file api/server.py reads (load_property_obstacles)
+    # — previously this wrote cowans.json, which nothing served, so real
+    # scout output never reached the companion app.
+    out_file = out_dir / 'obstacles.json'
+    tmp = out_file.with_suffix('.tmp')
+    with open(tmp, 'w') as f:
         json.dump(record, f, indent=2, default=str)
+    tmp.replace(out_file)
 
     record['output_path'] = str(out_file)
     print(f"Cowan cache saved to {out_file}")
@@ -161,15 +168,27 @@ def process_scout_imagery(
 def load_cached_cowans(property_id: str, root: str = 'data/properties') -> dict | None:
     """Load persisted Cowan cache for a property.
 
-    Returns the full record (with `last_scouted`, etc.) or None if absent.
-    Census missions call this on startup; if None or stale, the companion
-    app prompts the operator to run an Outer Guard scout flight.
+    Reads obstacles.json (canonical, shared with the API); falls back to
+    the legacy cowans.json written before 2026-07-04.  Returns the full
+    record (with `last_scouted`, etc.) normalised to carry an `obstacles`
+    key, or None if absent.  Census missions call this on startup; if None
+    or stale, the companion app prompts the operator to run an Outer Guard
+    scout flight.
     """
-    cowan_file = Path(root) / property_id / 'cowans.json'
-    if not cowan_file.is_file():
-        return None
-    with open(cowan_file) as f:
-        return json.load(f)
+    prop_dir = Path(root) / property_id
+    for filename in ('obstacles.json', 'cowans.json'):
+        cache_file = prop_dir / filename
+        if not cache_file.is_file():
+            continue
+        with open(cache_file) as f:
+            record = json.load(f)
+        if isinstance(record, list):
+            # Bare list (mock_data format) — wrap for a uniform return shape
+            record = {'property_id': property_id, 'obstacles': record}
+        elif 'obstacles' not in record and 'cowans' in record:
+            record['obstacles'] = record.pop('cowans')  # legacy key
+        return record
+    return None
 
 
 def is_scout_stale(record: dict, max_age_days: int = SCOUT_FRESHNESS_DAYS) -> bool:

@@ -45,14 +45,40 @@ class TestOuterGuard(unittest.TestCase):
     def test_tile_airspace(self):
         cowans = tile_airspace(str(self.log_path), str(self.output_dir))
         self.assertTrue(len(cowans) >= 1)
-        
+
         # Check if output file exists
         out_file = self.output_dir / "test_flight_log_tiled_airspace.json"
         self.assertTrue(out_file.exists())
-        
+
         with open(out_file) as f:
             data = json.load(f)
-            self.assertEqual(len(data), len(cowans))
+            self.assertFalse(data['rangefinder_missing'])
+            self.assertEqual(len(data['cowans']), len(cowans))
+
+    def test_parse_flight_log_flags_missing_rangefinder(self):
+        """A log without any rangefinder column must be marked degraded."""
+        bad_log = self.test_dir / "no_rangefinder.csv"
+        with open(bad_log, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(['latitude', 'longitude', 'altitude'])
+            writer.writerow([36.0, -76.0, 60.0])
+        readings, meta = parse_flight_log(str(bad_log), with_meta=True)
+        self.assertTrue(meta['rangefinder_missing'])
+        self.assertEqual(len(readings), 1)
+        # Degraded fallback: range = alt, so hazard height is zero
+        self.assertEqual(readings[0]['rangefinder_m'], readings[0]['drone_alt_m'])
+
+        # And the flag must surface in the tile_airspace output file
+        out_dir = self.output_dir / "degraded"
+        tile_airspace(str(bad_log), str(out_dir))
+        with open(out_dir / "no_rangefinder_tiled_airspace.json") as f:
+            data = json.load(f)
+        self.assertTrue(data['rangefinder_missing'])
+
+    def test_parse_flight_log_with_meta_ok_when_rangefinder_present(self):
+        readings, meta = parse_flight_log(str(self.log_path), with_meta=True)
+        self.assertFalse(meta['rangefinder_missing'])
+        self.assertEqual(len(readings), 15)
 
 if __name__ == '__main__':
     unittest.main()

@@ -25,6 +25,18 @@ TOWER_HEIGHT_MIN_M = 15       # above this + narrow profile -> probable tower
 MIN_PATTERN_POLES = 3         # need at least 3 to confirm a line
 SAFETY_BUFFER_M = 8           # added to obstacle height for Pass 2 altitude
 
+# ── Shared Pass 2 safety constants ───────────────────────────────────────────
+# These are the SINGLE source of truth for both the companion-app UI
+# (api/server.py) and the KMZ actually flown (core/waypoint_generator.py).
+# Any change here affects both surfaces identically — that is intentional.
+MIN_SAFE_ALT_M              = 15.0  # never descend below this
+SAFE_ALT_SEARCH_RADIUS_M    = 60.0  # baseline obstacle search radius
+SAFE_ALT_EXTRA_MARGIN_M     = 5.0   # extra margin on top of SAFETY_BUFFER_M
+WAYPOINT_APPROACH_BUFFER_M  = 20.0  # added to exclusion radius for lock checks
+
+# DJI flight-log column names that carry a true rangefinder reading.
+RANGEFINDER_COLUMNS = ('ultrasonic_height', 'OSD.ultraHeight [m]', 'rangefinder_m')
+
 
 @dataclass
 class Cowan:
@@ -53,19 +65,32 @@ def fetch_osm_power_lines(bounds: dict) -> list[dict]:
     """
     try:
         r = requests.post('https://overpass-api.de/api/interpreter', data=query, timeout=30)
+        r.raise_for_status()  # 429/504 HTML pages surface as HTTP errors, not JSON parse noise
         return r.json().get('elements', [])
     except Exception as e:
         print(f"  OSM fetch failed: {e}")
         return []
 
 
-def parse_flight_log(log_path: str) -> list[dict]:
+def parse_flight_log(log_path: str, with_meta: bool = False):
     """
     Parse DJI flight log CSV for rangefinder + GPS readings.
     Expected columns: latitude, longitude, altitude, ultrasonic_height
+
+    Parameters
+    ----------
+    with_meta : bool
+        If True, returns (readings, meta) where meta includes
+        'rangefinder_missing': True when NO known rangefinder column
+        (see RANGEFINDER_COLUMNS) exists in the log.  In that case every
+        reading falls back to range_m = alt, hazard_height() is 0 for all
+        rows, and ZERO hazards will be detected — the caller must surface
+        this degraded state to the operator instead of silently reporting
+        a hazard-free property.
     """
     import csv
     readings = []
+    rangefinder_missing = False
     with open(log_path, encoding='utf-8', errors='ignore') as f:
         # Some DJI logs have a header skip or different encodings
         content = f.read()
@@ -76,9 +101,21 @@ def parse_flight_log(log_path: str) -> list[dict]:
                 if 'latitude' in line.lower():
                     content = '\n'.join(lines[i:])
                     break
-        
+
         from io import StringIO
         reader = csv.DictReader(StringIO(content))
+        fieldnames = reader.fieldnames or []
+        if not any(col in fieldnames for col in RANGEFINDER_COLUMNS):
+            rangefinder_missing = True
+            print(
+                "\n"
+                "  *** WARNING: NO RANGEFINDER COLUMN FOUND IN FLIGHT LOG ***\n"
+                f"  Expected one of: {', '.join(RANGEFINDER_COLUMNS)}\n"
+                f"  Found columns:   {', '.join(fieldnames) or '(none)'}\n"
+                "  All readings fall back to range = altitude, so hazard height\n"
+                "  is ZERO for every point — NO obstacles can be detected from\n"
+                "  this log.  Do NOT treat the resulting airspace as hazard-free.\n"
+            )
         for row in reader:
             try:
                 # Map standard DJI log columns
@@ -87,7 +124,7 @@ def parse_flight_log(log_path: str) -> list[dict]:
                 alt = float(row.get('altitude') or row.get('OSD.height [m]') or 0)
                 # ultrasonic_height is usually rangefinder
                 range_m = float(row.get('ultrasonic_height') or row.get('OSD.ultraHeight [m]') or row.get('rangefinder_m') or alt)
-                
+
                 if lat != 0 and lon != 0:
                     readings.append({
                         'lat': lat,
@@ -97,6 +134,8 @@ def parse_flight_log(log_path: str) -> list[dict]:
                     })
             except (KeyError, ValueError):
                 continue
+    if with_meta:
+        return readings, {'rangefinder_missing': rangefinder_missing}
     return readings
 
 
@@ -215,15 +254,94 @@ def identify_cowans(readings: list[dict], osm_lines: list[dict]) -> list[Cowan]:
     return cowans
 
 
-def get_safe_altitude(lat: float, lon: float, cowans: list[Cowan], radius_m: float = 50) -> float:
-    """Return minimum safe Pass 2 altitude for a target coordinate."""
-    nearby = [
-        c for c in cowans
-        if haversine(lat, lon, c.lat, c.lon) <= radius_m
-    ]
-    if not nearby:
-        return 15.0  # default 15m if no obstacles detected nearby
-    return max(c.height_m for c in nearby) + SAFETY_BUFFER_M
+def _cowan_field(cowan, name: str, default=None):
+    """Read a field from either a Cowan dataclass or a plain dict.
+
+    The API layer works with JSON dicts; the KMZ path works with Cowan
+    dataclasses.  The shared safety functions below must treat both
+    identically, so all field access goes through this helper.
+    """
+    if isinstance(cowan, dict):
+        return cowan.get(name, default)
+    return getattr(cowan, name, default)
+
+
+def get_safe_altitude(
+    lat: float,
+    lon: float,
+    cowans: list,
+    radius_m: float = SAFE_ALT_SEARCH_RADIUS_M,
+) -> float:
+    """Return minimum safe Pass 2 altitude for a target coordinate.
+
+    SINGLE SOURCE OF TRUTH for safe altitude — used by BOTH
+    api/server.py (the altitude the operator sees in the companion app)
+    and core/waypoint_generator.py (the executeHeight the drone flies).
+    The two values must be identical; do not fork this logic.
+
+    Rules
+    -----
+    - A Cowan is considered if its distance to the target is within
+      max(radius_m, its own exclusion_radius_m).  Tall towers declare
+      guy-wire cones of height*1.5 which can exceed the baseline search
+      radius — ignoring them put waypoints at 15m inside wire cones.
+    - Altitude = max obstacle height + SAFETY_BUFFER_M + SAFE_ALT_EXTRA_MARGIN_M,
+      rounded, floored at MIN_SAFE_ALT_M.
+    - Cowans without coordinates (e.g. visual detections with lat/lon=None)
+      cannot be range-checked and are skipped here; they are handled by the
+      waypoint lock rule instead.
+    """
+    nearby_heights = []
+    for c in cowans:
+        c_lat = _cowan_field(c, 'lat')
+        c_lon = _cowan_field(c, 'lon')
+        if c_lat is None or c_lon is None:
+            continue
+        exclusion_r = float(_cowan_field(c, 'exclusion_radius_m', 0.0) or 0.0)
+        effective_radius = max(radius_m, exclusion_r)
+        if haversine(lat, lon, c_lat, c_lon) <= effective_radius:
+            nearby_heights.append(float(_cowan_field(c, 'height_m', 0.0) or 0.0))
+
+    if not nearby_heights:
+        return MIN_SAFE_ALT_M  # default if no obstacles detected nearby
+    return float(max(
+        MIN_SAFE_ALT_M,
+        round(max(nearby_heights) + SAFETY_BUFFER_M + SAFE_ALT_EXTRA_MARGIN_M),
+    ))
+
+
+def get_waypoint_lock(
+    lat: float,
+    lon: float,
+    cowans: list,
+    resolutions: dict,
+) -> tuple[str | None, str | None]:
+    """Return (locked_by, lock_reason) for a Pass 2 waypoint position.
+
+    SINGLE SOURCE OF TRUTH for the waypoint-lock safety gate — used by
+    BOTH api/server.py (UI lock display) and core/waypoint_generator.py
+    (which must EXCLUDE locked clusters from the flown KMZ).
+
+    A waypoint is locked when any LOW-confidence Cowan whose exclusion
+    zone (+ approach buffer) overlaps the position has not been resolved
+    'safe' by the operator.  Obstacles resolved 'hazard' stay locked.
+    """
+    for c in cowans:
+        if _cowan_field(c, 'confidence') != 'LOW':
+            continue
+        c_lat = _cowan_field(c, 'lat')
+        c_lon = _cowan_field(c, 'lon')
+        if c_lat is None or c_lon is None:
+            continue  # cannot range-check un-localised detections
+        exclusion_r = float(_cowan_field(c, 'exclusion_radius_m', 0.0) or 0.0)
+        dist = haversine(lat, lon, c_lat, c_lon)
+        if dist < exclusion_r + WAYPOINT_APPROACH_BUFFER_M:
+            c_id = _cowan_field(c, 'id', '')
+            decision = (resolutions or {}).get(c_id)
+            if decision != 'safe':
+                reason = 'Confirmed hazard' if decision == 'hazard' else 'Unresolved'
+                return c_id, f"{reason} obstacle nearby ({c_id})"
+    return None, None
 
 
 def merge_visual_cowans(
@@ -338,8 +456,9 @@ def tile_airspace(
     output_path.mkdir(parents=True, exist_ok=True)
 
     print(f"The Outer Guard is scanning flight log: {log_path}")
-    readings = parse_flight_log(log_path)
+    readings, log_meta = parse_flight_log(log_path, with_meta=True)
     print(f"  {len(readings)} telemetry points received")
+    rangefinder_missing = log_meta['rangefinder_missing']
 
     osm_lines = []
     if bounds:
@@ -359,7 +478,10 @@ def tile_airspace(
     mission_id = Path(log_path).stem
     out_file = output_path / f"{mission_id}_tiled_airspace.json"
     with open(out_file, 'w') as f:
-        json.dump([asdict(c) for c in cowans], f, indent=2)
+        json.dump({
+            'rangefinder_missing': rangefinder_missing,
+            'cowans': [asdict(c) for c in cowans],
+        }, f, indent=2)
 
     high = sum(1 for c in cowans if c.confidence == 'HIGH')
     med  = sum(1 for c in cowans if c.confidence == 'MEDIUM')
@@ -370,6 +492,11 @@ def tile_airspace(
         f"HIGH:{high} MEDIUM:{med} LOW:{low}  "
         f"(rangefinder:{len(cowans)-vis} visual:{vis})"
     )
+    if rangefinder_missing:
+        print(
+            "  *** DEGRADED RESULT: rangefinder data missing from flight log — "
+            "the hazard count above reflects visual/OSM sources only. ***"
+        )
     print(f"Security map saved to {out_file}")
     return cowans
 

@@ -81,8 +81,44 @@ def pixel_to_gps(px, py, img_shape, center_gps, gsd_m_per_px=0.05):
     return lat, lon
 
 
+def detect_blobs_geo(image_path: str) -> list[dict]:
+    """Single-image thermal blob detection with GPS georeferencing.
+
+    The per-image unit of run(), exposed for pipeline_runner watch-folder
+    mode.  Returns blob dicts carrying lat/lon/source_image — the format
+    cluster_detections() consumes.  Returns [] when the image has no EXIF
+    GPS or cannot be read.
+    """
+    gps = extract_gps(image_path)
+    if not gps:
+        return []
+
+    blobs = detect_blobs(image_path)
+    if not blobs:
+        return []
+
+    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        return []
+
+    geo_blobs = []
+    for blob in blobs:
+        lat, lon = pixel_to_gps(blob['pixel_x'], blob['pixel_y'], img.shape, gps)
+        geo_blobs.append({
+            **blob,
+            'lat': lat,
+            'lon': lon,
+            'source_image': Path(image_path).name,
+        })
+    return geo_blobs
+
+
 def cluster_detections(detections: list[dict], radius_m: float) -> list[dict]:
-    """Group nearby detections into herds using simple distance clustering."""
+    """Group nearby detections into herds using simple distance clustering.
+
+    Output clusters carry the schema api/server.py:derive_waypoints consumes:
+    id, lat, lon, count, confidence, label, source_images.
+    """
     if not detections:
         return []
 
@@ -110,10 +146,12 @@ def cluster_detections(detections: list[dict], radius_m: float) -> list[dict]:
         max_conf = 'HIGH' if any(x['confidence'] == 'HIGH' for x in group) else 'MEDIUM'
 
         clusters.append({
-            'lat': centroid_lat,
-            'lon': centroid_lon,
+            'id': f'cluster_{len(clusters) + 1:03d}',
+            'lat': float(centroid_lat),
+            'lon': float(centroid_lon),
             'count': len(group),
             'confidence': max_conf,
+            'label': '',
             'source_images': [x.get('source_image') for x in group],
         })
 
@@ -134,23 +172,10 @@ def run(mission_dir: str, output_dir: str):
     print(f"Processing {len(thermal_images)} thermal images...")
 
     for img_path in thermal_images:
-        gps = extract_gps(str(img_path))
-        if not gps:
+        if not extract_gps(str(img_path)):
             print(f"  No GPS in {img_path.name}, skipping")
             continue
-
-        blobs = detect_blobs(str(img_path))
-        img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
-
-        for blob in blobs:
-            lat, lon = pixel_to_gps(
-                blob['pixel_x'], blob['pixel_y'],
-                img.shape, gps
-            )
-            blob['lat'] = lat
-            blob['lon'] = lon
-            blob['source_image'] = img_path.name
-            all_detections.append(blob)
+        all_detections.extend(detect_blobs_geo(str(img_path)))
 
     clusters = cluster_detections(all_detections, CLUSTER_RADIUS_M)
     print(f"Found {len(all_detections)} blobs → {len(clusters)} clusters")

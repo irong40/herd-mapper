@@ -4,6 +4,7 @@ __pycache__/
 data/missions/
 data/detections/
 data/obstacles/
+data/tests/
 node_modules/
 dist/
 .venv/
