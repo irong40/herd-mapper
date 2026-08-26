@@ -61,6 +61,14 @@ def load_cowans(path: str) -> list[Cowan]:
                 "  *** WARNING: obstacle file is DEGRADED — flight log had no "
                 "rangefinder column; rangefinder hazards are absent. ***"
             )
+        # Safe by default: a wrapper with no visual_mode predates the
+        # provenance contract and cannot be assumed to have run a real model.
+        if data.get('visual_mode', 'stub') != 'onnx':
+            print(
+                "  *** WARNING: obstacle file is DEGRADED — visual obstacle "
+                "detection did not run; power lines, guy wires, towers and "
+                "antennas are absent from this hazard set. ***"
+            )
         data = data.get('cowans', data.get('obstacles', []))
     return [Cowan(**o) for o in data]
 

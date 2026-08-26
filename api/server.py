@@ -94,6 +94,21 @@ def load_property_obstacles(property_id: str) -> list | None:
     return data.get('obstacles', data.get('cowans', []))
 
 
+def load_property_visual_degraded(property_id: str) -> bool:
+    """True when the property's obstacle cache did not come from a real model.
+
+    Safe by default: a missing file, a bare-list legacy cache, or any record
+    without an explicit 'onnx' provenance stamp is reported as degraded.
+    """
+    path = DATA_DIR / 'properties' / property_id / 'obstacles.json'
+    data = load_json(path)
+    if data is None:
+        data = load_json(DATA_DIR / 'properties' / property_id / 'cowans.json')
+    if not isinstance(data, dict):
+        return True
+    return data.get('visual_mode', 'stub') != 'onnx'
+
+
 def load_property_bounds(property_id: str) -> dict | None:
     return load_json(DATA_DIR / 'properties' / property_id / 'bounds.json')
 
@@ -216,6 +231,9 @@ def build_scout_response(property_id: str) -> dict | None:
         'resolutions':   resolutions,
         'agl_range':     {'min_m': agl_min, 'max_m': agl_max},
         'obstacle_summary': _obstacle_summary(obstacles),
+        # Companion app must show this: a degraded set omits visually detected
+        # hazards, so agl_range above is incomplete.
+        'visual_degraded': load_property_visual_degraded(property_id),
     }
 
 

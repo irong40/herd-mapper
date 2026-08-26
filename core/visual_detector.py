@@ -68,6 +68,46 @@ CONF_MEDIUM = 0.60
 DEFAULT_CONF_THRESHOLD = 0.45
 DEFAULT_NMS_IOU        = 0.50
 
+# ─── Inference provenance ────────────────────────────────────────────────────
+# `mode` travels with every result so a caller can never mistake "the model was
+# absent and we returned nothing" for "the model ran and found nothing".
+# 'stub' is the SAFE DEFAULT: any result whose provenance was not explicitly
+# set to 'onnx' is treated as stub. Mirrors the fence-mapper Phase 3 contract
+# in core/fence_condition_detector.py so both projects report absence alike.
+VISUAL_MODE_ONNX: str = 'onnx'
+VISUAL_MODE_STUB: str = 'stub'
+
+# Surfaced wherever visual obstacles reach an operator or a written artifact.
+# A missed obstacle lowers the computed Pass 2 safe altitude, so silent absence
+# is a flight-safety condition, not a cosmetic gap.
+VISUAL_STUB_BANNER_TEXT: str = (
+    "DEGRADED RESULT: VISUAL OBSTACLE DETECTION DID NOT RUN. No obstacle "
+    "model was loaded, so this obstacle set contains NO visually detected "
+    "hazards (power lines, guy wires, towers, antennas). Safe-altitude and "
+    "waypoint-lock values derived from it are incomplete. Do not fly Pass 2 "
+    "against this result without an independent obstacle check."
+)
+
+
+def resolve_visual_mode(model_path: str | None) -> str:
+    """Provenance mode for a model path. Safe by default: absent file = stub."""
+    if model_path is None or not Path(model_path).is_file():
+        return VISUAL_MODE_STUB
+    return VISUAL_MODE_ONNX
+
+
+def visual_is_degraded(record: dict | None) -> bool:
+    """Safe-by-default provenance check for an in-flight or persisted record.
+
+    Anything not verifiably 'onnx' is degraded — including a legacy record
+    written before the mode field existed, and None.
+    """
+    if not record:
+        return True
+    mode = record.get('visual_mode', record.get('mode', VISUAL_MODE_STUB))
+    return mode != VISUAL_MODE_ONNX
+
+
 # Supported image extensions
 IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp'}
 
@@ -438,6 +478,40 @@ def detect_from_folder(
     return deduped
 
 
+def detect_from_folder_with_provenance(
+    image_dir: str,
+    model_path: str | None = None,
+    conf_threshold: float = DEFAULT_CONF_THRESHOLD,
+    iou_threshold: float = DEFAULT_NMS_IOU,
+) -> dict:
+    """Run the folder scan and stamp inference provenance onto the result.
+
+    PRIMARY entry point. Prefer this over detect_from_folder(), which returns a
+    bare list and therefore cannot distinguish "no model" from "no obstacles".
+
+    Returns
+    -------
+    dict
+        {'mode': 'onnx'|'stub', 'model_path': str|None, 'obstacles': list[dict]}
+    """
+    mode = resolve_visual_mode(model_path)
+    obstacles = detect_from_folder(
+        image_dir,
+        model_path=model_path,
+        conf_threshold=conf_threshold,
+        iou_threshold=iou_threshold,
+    )
+    if mode == VISUAL_MODE_STUB:
+        print()
+        print(f"  *** {VISUAL_STUB_BANNER_TEXT} ***")
+        print()
+    return {
+        'mode':       mode,
+        'model_path': str(model_path) if mode == VISUAL_MODE_ONNX else None,
+        'obstacles':  obstacles,
+    }
+
+
 # ─── CLI ─────────────────────────────────────────────────────────────────────
 
 def _cli() -> None:
@@ -469,12 +543,13 @@ def _cli() -> None:
     # Resolve mission ID from images path
     mission_id = Path(args.images).stem
 
-    cowans = detect_from_folder(
+    visual = detect_from_folder_with_provenance(
         args.images,
         model_path=args.model,
         conf_threshold=args.conf,
         iou_threshold=args.iou,
     )
+    cowans = visual['obstacles']
 
     # Strip internal-only fields before persisting
     exportable = [
@@ -486,10 +561,18 @@ def _cli() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / f'{mission_id}_visual_obstacles.json'
 
+    payload = {
+        'mission_id':      mission_id,
+        'visual_mode':     visual['mode'],
+        'visual_degraded': visual['mode'] != VISUAL_MODE_ONNX,
+        'obstacles':       exportable,
+    }
     with open(out_file, 'w') as f:
-        json.dump(exportable, f, indent=2, default=str)
+        json.dump(payload, f, indent=2, default=str)
 
     print(f"Saved {len(exportable)} visual obstacle(s) to {out_file}")
+    if visual['mode'] != VISUAL_MODE_ONNX:
+        print(f"  *** {VISUAL_STUB_BANNER_TEXT} ***")
 
 
 if __name__ == '__main__':

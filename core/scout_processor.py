@@ -42,7 +42,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from core.visual_detector import detect_from_folder
+from core.visual_detector import detect_from_folder_with_provenance
 
 try:
     from sentinel_core.metadata import extract_gps_from_exif
@@ -121,11 +121,12 @@ def process_scout_imagery(
         raise ValueError(f"Image directory not found: {image_dir}")
 
     print(f"Running visual detector on {image_dir}...")
-    raw_cowans = detect_from_folder(
+    visual = detect_from_folder_with_provenance(
         str(image_path),
         model_path=model_path,
         conf_threshold=conf_threshold,
     )
+    raw_cowans = visual['obstacles']
     print(f"  {len(raw_cowans)} raw Cowan detection(s) after dedup")
 
     enriched = _enrich_with_capture_gps(raw_cowans)
@@ -143,6 +144,11 @@ def process_scout_imagery(
         'last_scouted': datetime.now(timezone.utc).isoformat(),
         'image_count': len(image_files),
         'cowan_count': len(persistable),
+        # Provenance travels with the cache: a scout run with no model must be
+        # distinguishable from a scout run that genuinely found nothing.
+        'visual_mode': visual['mode'],
+        'visual_model_path': visual['model_path'],
+        'visual_degraded': visual['mode'] != 'onnx',
         'obstacles': persistable,
     }
 

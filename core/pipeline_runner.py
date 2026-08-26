@@ -41,7 +41,11 @@ except ImportError:
 import os
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.visual_detector import detect_from_folder
+from core.visual_detector import (
+    detect_from_folder_with_provenance,
+    VISUAL_MODE_STUB,
+    VISUAL_STUB_BANNER_TEXT,
+)
 from core.outer_guard import tile_airspace, haversine
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s  %(levelname)s  %(message)s')
@@ -110,16 +114,31 @@ def _write_detections(mission_dir: Path, mission_id: str, blobs: list[dict], clu
     _write_json_atomic(mission_dir / 'detections.json', payload)
 
 
-def _write_obstacles(mission_dir: Path, mission_id: str, cowans: list) -> None:
+def _write_obstacles(
+    mission_dir: Path, mission_id: str, cowans: list,
+    visual_mode: str = VISUAL_MODE_STUB,
+) -> None:
+    """Persist obstacles with visual-inference provenance attached.
+
+    Written as a dict wrapper so the degraded flag travels with the data —
+    api/server.py and waypoint_generator.load_cowans both already accept
+    either a bare list or a {'obstacles': [...]} wrapper.
+    """
     from dataclasses import asdict
     raw = [asdict(c) if hasattr(c, '__dataclass_fields__') else c for c in cowans]
-    _write_json_atomic(mission_dir / 'obstacles.json', raw)
+    payload = {
+        'mission_id':      mission_id,
+        'visual_mode':     visual_mode,
+        'visual_degraded': visual_mode != 'onnx',
+        'obstacles':       raw,
+    }
+    _write_json_atomic(mission_dir / 'obstacles.json', payload)
     # Also write the legacy path api/server.py falls back to when the mission
     # has no property-level obstacles (data/obstacles/{id}_obstacles.json) so
     # pipeline output is actually reachable by the companion app.
     legacy_dir = mission_dir.parent.parent / 'obstacles'
     legacy_dir.mkdir(parents=True, exist_ok=True)
-    _write_json_atomic(legacy_dir / f'{mission_id}_obstacles.json', raw)
+    _write_json_atomic(legacy_dir / f'{mission_id}_obstacles.json', payload)
 
 
 # ── Core processing ──────────────────────────────────────────────────────────
@@ -145,6 +164,7 @@ class MissionProcessor:
         self.blob_detections:  list[dict] = []
         self.clusters:         list[dict] = []
         self.visual_cowans:    list[dict] = []
+        self.visual_mode:      str        = VISUAL_MODE_STUB
         self.all_cowans:       list       = []
         self.error: str | None = BLOB_IMPORT_ERROR
 
@@ -193,10 +213,12 @@ class MissionProcessor:
         logger.info("Pipeline: running batch — %d images so far", len(self.processed_images))
 
         # Visual obstacle detection across images dir
-        self.visual_cowans = detect_from_folder(
+        visual = detect_from_folder_with_provenance(
             str(self.images_dir),
             model_path=self.model_path,
         )
+        self.visual_cowans = visual['obstacles']
+        self.visual_mode   = visual['mode']
 
         # Outer Guard: use flight log if present, else skip (guard will warn)
         if self.flight_log.is_file():
@@ -205,6 +227,7 @@ class MissionProcessor:
                     log_path=str(self.flight_log),
                     output_dir=str(self.mission_dir),
                     visual_detections=self.visual_cowans,
+                    visual_mode=self.visual_mode,
                 )
             except Exception as exc:
                 logger.warning("outer_guard tile_airspace failed: %s", exc)
@@ -223,7 +246,10 @@ class MissionProcessor:
             self.clusters = cluster_detections(self.blob_detections, CLUSTER_RADIUS_M)
 
         _write_detections(self.mission_dir, self.mission_id, self.blob_detections, self.clusters)
-        _write_obstacles(self.mission_dir, self.mission_id, self.all_cowans)
+        _write_obstacles(
+            self.mission_dir, self.mission_id, self.all_cowans,
+            visual_mode=self.visual_mode,
+        )
         self._print_progress()
 
     def finalize(self) -> None:

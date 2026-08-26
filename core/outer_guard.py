@@ -435,6 +435,7 @@ def tile_airspace(
     output_dir: str,
     bounds: Optional[dict] = None,
     visual_detections: list[dict] | None = None,
+    visual_mode: str = 'stub',
 ):
     """
     Tiles the mission airspace by identifying hazards and saving a security map.
@@ -451,6 +452,11 @@ def tile_airspace(
         Optional Cowan-format dicts from visual_detector.detect_from_folder().
         If provided, they are merged (with deduplication) into the rangefinder
         cowans before the security map is written.
+    visual_mode : str
+        Inference provenance for visual_detections: 'onnx' when a real model
+        ran, 'stub' otherwise. Safe default is 'stub' — an unstamped caller is
+        treated as degraded, because a silently absent visual layer lowers the
+        computed Pass 2 safe altitude.
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -480,6 +486,8 @@ def tile_airspace(
     with open(out_file, 'w') as f:
         json.dump({
             'rangefinder_missing': rangefinder_missing,
+            'visual_mode': visual_mode,
+            'visual_degraded': visual_mode != 'onnx',
             'cowans': [asdict(c) for c in cowans],
         }, f, indent=2)
 
@@ -496,6 +504,12 @@ def tile_airspace(
         print(
             "  *** DEGRADED RESULT: rangefinder data missing from flight log — "
             "the hazard count above reflects visual/OSM sources only. ***"
+        )
+    if visual_mode != 'onnx':
+        print(
+            "  *** DEGRADED RESULT: visual obstacle detection did not run (no "
+            "model loaded) — the hazard count above contains NO visually "
+            "detected obstacles (power lines, guy wires, towers, antennas). ***"
         )
     print(f"Security map saved to {out_file}")
     return cowans
